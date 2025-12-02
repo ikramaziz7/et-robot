@@ -11,6 +11,7 @@ int main(int argc, const char *argv[])
     int sensor_val = read_sensor();
     printf("Sensor value: %d\n", sensor_val);
 
+    // We need to implement this...
 
     return 0;
 }
