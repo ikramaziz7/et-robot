@@ -56,4 +56,5 @@ eth1: interface with robot
 
 ### On robot
 Set static IP, correct netmask and gateway IP to eth1 IP. Might have to change DNS in /etc/resolv.conf.
+..
 
