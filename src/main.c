@@ -26,8 +26,27 @@ int main(int argc, const char *argv[])
     
     printf("Motors detected!\n");
     
-    // Move forward for 5 seconds
-    move_forward();
+
+    //Test moving functions
+    // Move: 1=forward, -1=backward
+    // Turn: 1=right, -1=left
+    // move forward 5 seconds, turn until color sensor reads 5, move backward 5 seconds, turn left 3 seconds, turn right 3 seconds, turn left 360 degrees (motor degrees)
+    move(1);
+    Sleep(5000);
+    stop_motors();
+    turn_until_colorsensor(5);
+    move(-1);
+    Sleep(5000);
+    stop_motors();
+    turn(-1);
+    Sleep(3000);
+    stop_motors();
+    turn(1);
+    Sleep(3000);
+    stop_motors();
+    turn_left_degrees(360);
+    
+
     
     printf("Done!\n");
     ev3_uninit();
