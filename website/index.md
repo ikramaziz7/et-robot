@@ -104,7 +104,7 @@ The project emphasizes both technical implementation and clear documentation.
 * Photos of the robot during assembly
 * Videos demonstrating autonomous behavior and movement
 
-*(Add images/videos here)*
+![Robot](images/Screenshot_2025-12-17_at_17.28.45.png)
 
 ---
 
