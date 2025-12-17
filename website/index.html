@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Mining Robot – OS Project</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #222;
+        }
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+        }
+        section {
+            max-width: 900px;
+            margin: auto;
+            background: white;
+            padding: 2rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+        }
+        h2 {
+            border-bottom: 2px solid #eee;
+            padding-bottom: 0.5rem;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 1rem;
+            overflow-x: auto;
+        }
+        footer {
+            text-align: center;
+            padding: 1rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        img {
+            max-width: 100%;
+            display: block;
+            margin: 1rem auto;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Resource Mining Robot</h1>
+    <p>Operating Systems Project</p>
+</header>
+
+<section>
+    <h2>Team</h2>
+    <ul>
+        <li><strong>Member 1</strong> – Hardware & Movement</li>
+        <li><strong>Member 2</strong> – Sensors & Strategy</li>
+        <li><strong>Member 3</strong> – Integration & Website</li>
+    </ul>
+</section>
+
+<section>
+    <h2>Project Overview</h2>
+    <p>
+        This project was developed as part of the <em>Operating Systems</em> course. The objective is to design and program an autonomous robot capable of navigating an arena, detecting obstacles or resources, and executing a predefined strategy.
+    </p>
+    <p>
+        The robot is built using a LEGO Mindstorms platform and programmed in <strong>C</strong> under a Linux-based environment. The software architecture follows a modular design separating hardware control from high-level decision making.
+    </p>
+</section>
+
+<section>
+    <h2>Robot Architecture</h2>
+    <h3>Hardware</h3>
+    <p>
+        The robot is based on a differential drive system with two independently controlled wheels. A vertical mechanical structure is used to push or transport resources. Sensors (ultrasonic and/or color) provide information about the environment.
+    </p>
+
+    <img src="images/robot.jpg" alt="Robot photo">
+
+    <h3>Software</h3>
+    <ul>
+        <li><code>main.c</code> – Program entry point and control loop</li>
+        <li><code>movement.c</code> – Low-level motor control</li>
+        <li><code>sensors.c</code> – Sensor access and abstraction</li>
+        <li><code>strategy.c</code> – High-level robot behavior</li>
+    </ul>
+</section>
+
+<section>
+    <h2>Algorithms and Strategy</h2>
+    <p>The robot operates autonomously using a continuous control loop:</p>
+
+    <pre>
+while robot is running:
+    read sensors
+    if obstacle or resource detected:
+        react (turn, stop, activate mechanism)
+    else:
+        move forward
+    </pre>
+
+    <p>
+        The strategy prioritizes simplicity and robustness to ensure reliable behavior during the competition.
+    </p>
+</section>
+
+<section>
+    <h2>Usage Instructions</h2>
+    <h3>Compilation</h3>
+    <pre>
+make
+    </pre>
+
+    <h3>Execution</h3>
+    <pre>
+./robot
+    </pre>
+
+    <p>Ensure that all motors and sensors are properly connected before running the program.</p>
+</section>
+
+<section>
+    <h2>Development Process</h2>
+    <p>
+        The project was developed collaboratively using GitLab for version control. Each team member contributed code and documentation, with regular testing performed directly on the robot.
+    </p>
+</section>
+
+<section>
+    <h2>Media</h2>
+    <p>
+        Photos and videos demonstrating the robot assembly and autonomous behavior are provided below.
+    </p>
+    <!-- Add videos or additional images here -->
+</section>
+
+<footer>
+    <p>Operating Systems Project – 2025</p>
+</footer>
+
+</body>
+</html>
