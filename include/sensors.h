@@ -1,6 +1,8 @@
 #ifndef SENSORS_H
 #define SENSORS_H
 
-int read_sensor();
+char* getColor();
+int getTurnError(int target_angle);
+void initSensors();
 
 #endif // SENSORS_H
