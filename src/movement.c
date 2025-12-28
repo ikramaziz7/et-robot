@@ -5,164 +5,298 @@
 #include "ev3_port.h"
 #include "ev3_tacho.h"
 #include "brick.h"
-
-#ifndef __WIN32__
+#include "state_machine.h"
 #include <unistd.h>
-#define Sleep( msec ) usleep(( msec ) * 1000 )
-#endif
 
-// Helper function to find motors on ports A and B
-static int find_motors(uint8_t *sn_left, uint8_t *sn_right) {
-    if (ev3_search_tacho_plugged_in(OUTPUT_A, 0, sn_left, 0) &&
-        ev3_search_tacho_plugged_in(OUTPUT_B, 0, sn_right, 0)) {
+#define Sleep( msec ) usleep(( msec ) * 1000 )
+
+static uint8_t sn_left = 0xFF;
+static uint8_t sn_right = 0xFF;
+
+// Initialize motors once
+int init_motors(void) {
+    if (ev3_search_tacho_plugged_in(OUTPUT_C, 0, &sn_left, 0) &&
+        ev3_search_tacho_plugged_in(OUTPUT_B, 0, &sn_right, 0)) {
+        printf("Motors found: Left=C, Right=B\n");
+        stop_motors();
         return 1;
     }
-    printf("Motors NOT found on ports A and B\n");
+    printf("Motors NOT found on ports C and B\n");
     return 0;
 }
 
-// Move function
-// direction: 1 for forward, -1 for backward
-void move(int direction) {
-    uint8_t sn_left, sn_right;
+void move(int direction, int speed_ratio) {
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
+    }
+
+    if (speed_ratio < 0) speed_ratio = 0;
+    if (speed_ratio > 100) speed_ratio = 100;
+
     int max_speed;
-    
-    if (!find_motors(&sn_left, &sn_right)) return;
-    
     get_tacho_max_speed(sn_left, &max_speed);
-    printf("Max speed = %d\n", max_speed);
-    
-    // Calculate speed based on direction
-    // (-1 for backward, 1 for forward)
-    int speed = (max_speed * 2 / 3) * direction;
-    
-    // Configure both motors
+
+    int speed = (max_speed * speed_ratio / 100) * direction;
+
     set_tacho_speed_sp(sn_left, speed);
     set_tacho_speed_sp(sn_right, speed);
-    
-    // Run both motors forever (no time limit)
+
     set_tacho_command_inx(sn_left, TACHO_RUN_FOREVER);
     set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
-    
-    printf("Motors running\n");
 }
 
-void stop_motors() {
-    uint8_t sn_left, sn_right;
-    
-    if (!find_motors(&sn_left, &sn_right)) return;
 
-    // Set stop action before stopping
-    // TODO: could use TACHO_HOLD instead which holds motor position, TACHO_COAST does not actively breake
-    // TODO: we could also pass this into the function as a parameter if it changes what we want
-    set_tacho_stop_action_inx(sn_left, TACHO_BRAKE);  
-    set_tacho_stop_action_inx(sn_right, TACHO_BRAKE);
-    
+// Stop motors with HOLD for precision
+void stop_motors(void) {
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
+    }
+
+    set_tacho_stop_action_inx(sn_left, TACHO_COAST);
+    set_tacho_stop_action_inx(sn_right, TACHO_COAST);
     set_tacho_command_inx(sn_left, TACHO_STOP);
     set_tacho_command_inx(sn_right, TACHO_STOP);
-    
-    printf("Motors stopped\n");
 }
 
-// Turn function
-// direction: -1 for left, 1 for right
-void turn(int direction) {
-    uint8_t sn_left, sn_right;
-    int max_speed;
-    
-    if (!find_motors(&sn_left, &sn_right)) return;
-    
-    get_tacho_max_speed(sn_left, &max_speed);
-    
-    if (direction < 0) {  // Left turn
-        // Left motor stopped, right motor forward
-        set_tacho_speed_sp(sn_left, 0);
-        set_tacho_speed_sp(sn_right, max_speed * 2 / 3);
-    } else {  // Right turn
-        // Left motor forward, right motor stopped
-        set_tacho_speed_sp(sn_left, max_speed * 2 / 3);
-        set_tacho_speed_sp(sn_right, 0);
+// Turn on spot: -1=left, 1=right
+void turn(int direction, int speed_ratio) {
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
     }
-    
+
+    int max_speed;
+    get_tacho_max_speed(sn_left, &max_speed);
+    int speed = max_speed * speed_ratio / 100;
+
+    set_tacho_speed_sp(sn_left, -speed * direction);
+    set_tacho_speed_sp(sn_right, speed * direction);
+
     set_tacho_command_inx(sn_left, TACHO_RUN_FOREVER);
     set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
 }
 
 
-// Degrees is based on motor rotation, not robot turn degrees
-//TODO: This depends on wheel diameter and wheel base which we can calibrate if wanted
-void turn_left_degrees(int degrees) {
-    uint8_t sn_left, sn_right;
+void turn_degrees(int degrees, int direction) {
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
+    }
+
     int max_speed;
-    FLAGS_T state;
-    
-    printf("Turning left %d degrees...\n", degrees);
-    
-    if (!find_motors(&sn_left, &sn_right)) return;
-    
     get_tacho_max_speed(sn_left, &max_speed);
-    
-    // Configure left motor - move backward (negative)
-    set_tacho_stop_action_inx(sn_left, TACHO_BRAKE);
-    set_tacho_speed_sp(sn_left, -(max_speed / 2));
-    set_tacho_position_sp(sn_left, -degrees);
-    
-    // Configure right motor - move forward (positive)
-    set_tacho_stop_action_inx(sn_right, TACHO_BRAKE);
-    set_tacho_speed_sp(sn_right, max_speed / 2);
-    set_tacho_position_sp(sn_right, degrees);
-    
-    // Start both motors to run to relative position
+
+    set_tacho_stop_action_inx(sn_left, TACHO_HOLD);
+    set_tacho_stop_action_inx(sn_right, TACHO_HOLD);
+
+    set_tacho_speed_sp(sn_left,  (max_speed / 2) * direction);
+    set_tacho_speed_sp(sn_right, (max_speed / 2) * -direction);
+
+    set_tacho_position_sp(sn_left,  degrees * direction);
+    set_tacho_position_sp(sn_right, degrees * -direction);
+
     set_tacho_command_inx(sn_left, TACHO_RUN_TO_REL_POS);
     set_tacho_command_inx(sn_right, TACHO_RUN_TO_REL_POS);
-    
-    // Wait for turn to complete
-    Sleep(100);
+
+    FLAGS_T state_left, state_right;
+
+    /* Wait until BOTH motors are done */
     do {
-        get_tacho_state_flags(sn_left, &state);
-    } while (state);
-    
-    printf("Turn left complete\n");
+        get_tacho_state_flags(sn_left,  &state_left);
+        get_tacho_state_flags(sn_right, &state_right);
+        Sleep(5);
+    } while (state_left != 0 || state_right != 0);
+
+    printf("Turn %s %d degrees complete\n",
+           (direction < 0) ? "left" : "right",
+           degrees);
 }
 
+/**
+ * Turn robot in place by a specific angle
+ * @param angle: motor rotation degrees (not robot degrees)
+ * @param direction: -1=left, 1=right
+ * @param speed_percent: 0-100 (% of max speed)
+ */
+void turn_degrees_speed(int angle, int direction, int speed_percent) {
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
+    }
 
-void turn_until_colorsensor(int target_value) {
-    uint8_t sn_left, sn_right;
-    uint8_t color_sensor;
+    if (speed_percent < 0) speed_percent = 0;
+    if (speed_percent > 100) speed_percent = 100;
+
     int max_speed;
-    int sensor_value;
+    get_tacho_max_speed(sn_left, &max_speed);
+    int speed = max_speed * speed_percent / 100;
+
+    // Set stop action
+    set_tacho_stop_action_inx(sn_left, TACHO_HOLD);
+    set_tacho_stop_action_inx(sn_right, TACHO_HOLD);
+
+    // Set motor speeds: left and right turn in opposite directions
+    set_tacho_speed_sp(sn_left, speed * direction);
+    set_tacho_speed_sp(sn_right, speed * -direction);
+
+    // Set relative position
+    set_tacho_position_sp(sn_left, angle * direction);
+    set_tacho_position_sp(sn_right, angle * -direction);
+
+    // Run to relative position
+    set_tacho_command_inx(sn_left, TACHO_RUN_TO_REL_POS);
+    set_tacho_command_inx(sn_right, TACHO_RUN_TO_REL_POS);
+
+    // Wait until both motors stop
+    FLAGS_T state_left, state_right;
+    do {
+        get_tacho_state_flags(sn_left, &state_left);
+        get_tacho_state_flags(sn_right, &state_right);
+        Sleep(5);
+    } while (state_left != 0 || state_right != 0);
+
     
-    printf("Turning until sensor reaches %d\n", target_value);
-    
-    // Find the color sensor
-    color_sensor = sensor_search(LEGO_EV3_COLOR);
-    
-    if (color_sensor == SENSOR__NONE_) {
-        printf("Color sensor not found!\n");
+    printf("Turn %s %d degrees at %d%% speed complete\n",
+           (direction < 0) ? "left" : "right",
+           angle,
+           speed_percent);
+}
+
+void start_move_with_arc(RobotContext *ctx,
+                         int direction,
+                         int speed_percent,
+                         int target_degrees)
+{
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
+    }
+
+    if (direction != -1 && direction != 1) return;
+    if (speed_percent < 0) speed_percent = 0;
+    if (speed_percent > 100) speed_percent = 100;
+
+    int max_speed;
+    get_tacho_max_speed(sn_left, &max_speed);
+
+    /* Curve tuning */
+    const int CURVE_DELTA = 40;  // increase for tighter arc
+
+    int left_pct  = speed_percent;
+    int right_pct = speed_percent;
+
+    if (direction < 0) {
+        left_pct -= CURVE_DELTA;          // curve left
+        if (left_pct < 10) left_pct = 10;
+    } else {
+        right_pct -= CURVE_DELTA;         // curve right
+        if (right_pct < 10) right_pct = 10;
+    }
+
+    /* ---- Store motion state ---- */
+    ctx->turn_active         = 1;
+    ctx->turn_direction      = direction;
+    ctx->turn_speed_percent  = speed_percent;
+    ctx->turn_target_degrees = target_degrees;
+    ctx->turn_start_gyro     = getGyroAngle();
+
+    /* ---- Forward motion with curvature ---- */
+    set_tacho_speed_sp(sn_left,  max_speed * left_pct  / 100);
+    set_tacho_speed_sp(sn_right, max_speed * right_pct / 100);
+
+    set_tacho_command_inx(sn_left,  TACHO_RUN_FOREVER);
+    set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
+
+    printf("Arc move started: %s, speed=%d%%, target=%d°\n",
+           (direction < 0) ? "left" : "right",
+           speed_percent,
+           target_degrees);
+}
+
+void update_move_with_arc(RobotContext *ctx)
+{
+    if (!ctx->turn_active) return;
+
+    int current_gyro = getGyroAngle();
+    int delta = abs(current_gyro - ctx->turn_start_gyro);
+
+    if (delta >= ctx->turn_target_degrees) {
+        stop_motors();
+        ctx->turn_active = 0;
+
+        printf("Arc move complete (gyro delta = %d°)\n", delta);
+    }
+}
+
+void start_turn(RobotContext *ctx, int degrees, int direction, int speed_percent) {
+    if (sn_left == 0xFF || sn_right == 0xFF) {
+        if (!init_motors()) return;
+    }
+
+    if (degrees <= 0) return;
+    if (direction != -1 && direction != 1) return;
+
+    if (speed_percent < 0) speed_percent = 0;
+    if (speed_percent > 100) speed_percent = 100;
+
+    int max_speed;
+    get_tacho_max_speed(sn_left, &max_speed);
+    int speed = max_speed * speed_percent / 100;
+
+    /* Store turn state */
+    ctx->turn_active         = 1;
+    ctx->turn_direction      = direction;
+    ctx->turn_speed_percent  = speed_percent;
+    ctx->turn_target_degrees = degrees;
+    ctx->turn_start_gyro     = getGyroAngle();
+
+    /* Motor setup */
+    set_tacho_stop_action_inx(sn_left,  TACHO_HOLD);
+    set_tacho_stop_action_inx(sn_right, TACHO_HOLD);
+
+    set_tacho_speed_sp(sn_left,  speed * direction);
+    set_tacho_speed_sp(sn_right, speed * -direction);
+
+    set_tacho_command_inx(sn_left,  TACHO_RUN_FOREVER);
+    set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
+
+    printf("Gyro turn started: %s %d deg at %d%%\n",
+           (direction < 0) ? "left" : "right",
+           degrees,
+           speed_percent);
+}
+
+void update_turn(RobotContext *ctx) {
+    if (!ctx->turn_active) return;
+
+    int current_gyro = getGyroAngle();
+    int delta = abs(current_gyro - ctx->turn_start_gyro);
+
+    if (delta >= ctx->turn_target_degrees) {
+        stop_motors();
+        ctx->turn_active = 0;
+
+        printf("Gyro turn complete (delta=%d)\n", delta);
+    }
+}
+
+void get_encoder_deltas(int *d_left, int *d_right)
+{
+    static int last_left, last_right;
+    static int initialized = 0;  // flag
+
+    int cur_left, cur_right;
+    get_tacho_position(sn_left, &cur_left);
+    get_tacho_position(sn_right, &cur_right);
+
+    if (!initialized) {
+        last_left = cur_left;
+        last_right = cur_right;
+        *d_left = 0;
+        *d_right = 0;
+        initialized = 1;
         return;
     }
-    
-    if (!find_motors(&sn_left, &sn_right)) return;
-    
-    get_tacho_max_speed(sn_left, &max_speed);
-    
-    // Start turning right
-    set_tacho_speed_sp(sn_left, max_speed / 2); 
-    set_tacho_speed_sp(sn_right, -(max_speed / 2));
-    
-    set_tacho_command_inx(sn_left, TACHO_RUN_FOREVER);
-    set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
-    
-    // Keep turning until sensor reaches target
-    do {
-        get_sensor_value0(color_sensor, &sensor_value);
-        printf("Current sensor value: %d\n", sensor_value);
-        // Check every 50ms
-        Sleep(50);
-    } while (sensor_value != target_value);
-    
-    // Stop turn
-    stop_motors();
-    
-    printf("Target sensor value reached: %d\n", sensor_value);
+
+    *d_left  = cur_left  - last_left;
+    *d_right = cur_right - last_right;
+
+    last_left  = cur_left;
+    last_right = cur_right;
 }
