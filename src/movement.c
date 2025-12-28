@@ -300,3 +300,68 @@ void get_encoder_deltas(int *d_left, int *d_right)
     last_left  = cur_left;
     last_right = cur_right;
 }
+
+// Control the lift arm motor (raise/lower conveyor belt)
+// 1 to raise, -1 to lower, 0 to stop
+// TODO: will need to determine if we just have a preset time after raising to stop
+void control_lift_arm(int direction) {
+    uint8_t sn_lift;
+    int max_speed;
+    
+    // Search for motor on port C (orange motor)
+    if (!ev3_search_tacho_plugged_in(OUTPUT_C, 0, &sn_lift, 0)) {
+        printf("Lift arm motor NOT found on port C\n");
+        return;
+    }
+    
+    if (direction == 0) {
+        // Stop the lift motor
+        set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
+        set_tacho_command_inx(sn_lift, TACHO_STOP);
+        printf("Lift arm stopped\n");
+        return;
+    }
+    
+    get_tacho_max_speed(sn_lift, &max_speed);
+    
+    // Set speed (and direction)
+    int speed = (max_speed / 2) * direction;
+    set_tacho_speed_sp(sn_lift, speed);
+    
+    // Run the motor
+    set_tacho_command_inx(sn_lift, TACHO_RUN_FOREVER);
+    
+    printf("Lift arm %s\n", direction > 0 ? "raising" : "lowering");
+}
+
+// Control the grabber motor (open/close)
+// 1 to close, -1 to open, 0 to stop
+void control_grabber(int direction) {
+    uint8_t sn_grabber;
+    int max_speed;
+    
+    // Search for motor on port D
+    if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_grabber, 0)) {
+        printf("Grabber motor NOT found on port D\n");
+        return;
+    }
+    
+    if (direction == 0) {
+        // Stop the grabber motor
+        set_tacho_stop_action_inx(sn_grabber, TACHO_HOLD);
+        set_tacho_command_inx(sn_grabber, TACHO_STOP);
+        printf("Grabber stopped\n");
+        return;
+    }
+    
+    get_tacho_max_speed(sn_grabber, &max_speed);
+    
+    // Set speed (and direction))
+    int speed = (max_speed / 3) * direction;
+    set_tacho_speed_sp(sn_grabber, speed);
+    
+    // Run the motor
+    set_tacho_command_inx(sn_grabber, TACHO_RUN_FOREVER);
+    
+    printf("Grabber %s\n", direction > 0 ? "closing" : "opening");
+}

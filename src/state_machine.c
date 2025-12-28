@@ -161,14 +161,24 @@ static void state_approach_mineral(RobotContext *ctx) {
 }
 
 static void state_pickup_mineral(RobotContext *ctx) {
+    unsigned long elapsed = millis() - ctx->state_entry_time_ms;
+    
     if (ctx->state_just_entered) {
         printf("[STATE] PICKUP MINERAL\n");
         ctx->state_just_entered = 0;
+        
+        control_grabber(1); 
     }
 
-    // TODO implement pickup functionality...
-    Sleep(1000);
-    change_state(ctx, STATE_RETURN_HOME);
+    if (elapsed > 1500 && elapsed <= 2500) {
+        control_grabber(0);
+        control_lift_arm(1);
+    }
+    
+    if (elapsed > 2500) {
+        control_lift_arm(0);
+        change_state(ctx, STATE_RETURN_HOME);
+    }
 }
 
 static void state_return_home(RobotContext *ctx) {
@@ -211,16 +221,32 @@ static void state_return_home(RobotContext *ctx) {
 }
 
 static void state_drop_mineral(RobotContext *ctx) {
+    unsigned long elapsed = millis() - ctx->state_entry_time_ms;
+    
     if (ctx->state_just_entered) {
         printf("[STATE] DROP MINERAL\n");
         ctx->state_just_entered = 0;
         smooth_align_turn = 0;
         ctx->target_ore_index++;
+        
+        // Open grabber to release mineral
+        control_grabber(-1); 
     }
 
-    // TODO implement drop mineral functionality
-    Sleep(2000);
-    change_state(ctx, STATE_EXPLORE);
+    if (elapsed > 2000 && elapsed <= 3000) {
+        control_grabber(0);
+        move(-1, EXPLORE_SPEED);
+    }
+    
+    // Grabber moves backwards so there is room to lower the lift
+    if (elapsed > 3000) {
+        stop_motors();
+        control_lift_arm(-1);
+        // TODO: decide how long to lower lift or set defaults
+        Sleep(500); 
+        control_lift_arm(0); 
+        change_state(ctx, STATE_EXPLORE);
+    }
 }
 
 static void state_avoid_obstacle(RobotContext *ctx) {
