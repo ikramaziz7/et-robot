@@ -7,7 +7,10 @@ SOURCE_DIR  = ./src
 
 OBJS = \
 	$(BUILD_DIR)/movement.o \
+	$(BUILD_DIR)/position.o \
 	$(BUILD_DIR)/sensors.o \
+	$(BUILD_DIR)/state_machine.o \
+	$(BUILD_DIR)/time_utils.o \
 	$(BUILD_DIR)/main.o
 
 export LD_LIBRARY_PATH := $(CURDIR)/ev3dev-c/lib

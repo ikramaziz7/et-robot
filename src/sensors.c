@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sensors.h>
+#include <unistd.h>
 #include "ev3.h"
 #include "ev3_port.h"
 #include "ev3_tacho.h"
@@ -15,10 +17,7 @@
 #endif
 
 #define COLOR_MAX 7
-
-/* ---------------- GLOBALS ---------------- */
-
-const char *color[] = { "?", "BLACK", "BLUE", "GREEN", "YELLOW", "RED", "WHITE", "BROWN" };
+#define Sleep( msec ) usleep(( msec ) * 1000 )
 
 uint8_t sn_gyro  = DESC_LIMIT;   // gyro sensor index
 uint8_t sn_color = DESC_LIMIT;   // color sensor index
@@ -29,6 +28,8 @@ int gyro_zero = 0;
 
 int gyro_val;
 int color_val;
+int sonar_val;
+int compass_val;
 
 // Calibration constants
 #define OBSTACLE_THRESHOLD_CM 20.0  // Default safe distance
@@ -42,16 +43,18 @@ char* getColor() {
 
     if (sn_color == DESC_LIMIT) {
         printf("Color sensor not initialized\n");
-        val = 0;
+        return COLOR_UNKNOWN;
     }
 
     if (!get_sensor_value(0, sn_color, &val) || val < 0 || val > COLOR_MAX) {
         printf("No color detected\n");
-        val = 0;
+        return COLOR_UNKNOWN;
     }
 
-    printf("Color: %s\n", color[val]);
-    return color[color_val];
+    color_val = val;  // optional, if you still want to store last value
+
+    //printf("Color detected: %d\n", val);  // optional debug
+    return (ColorType)val;
 }
 
 void resetGyro(void) {
@@ -61,28 +64,37 @@ void resetGyro(void) {
     get_sensor_value(0, sn_gyro, &gyro_zero);
 }
 
-int getTurnError(int target_angle) {
-    int raw_angle;
-    int current_angle;
-    int error;
-
-    if (sn_gyro == DESC_LIMIT)
-        return 0;
-
-    if (!get_sensor_value(0, sn_gyro, &raw_angle))
-        return 0;
-
-    current_angle = raw_angle - gyro_zero;
-    error = target_angle - current_angle;
-
-    if (abs(error) < 2)
-        error = 0;
-
-    return error;
+int getGyroAngle(void) {
+    int raw;
+    if (!get_sensor_value(0, sn_gyro, &raw)) return 0;
+    return raw - gyro_zero;
 }
 
-/* ---------------- SENSOR INIT ---------------- */
+int get_compass_value(void) {
+    if (!get_sensor_value(0, sn_compass, &compass_val)) return 0;
+    return compass_val;
+}
 
+int getDistanceCM(void) {
+    int val;
+
+    if (sn_sonar == DESC_LIMIT) {
+        printf("Sonar sensor not initialized\n");
+        return -1;
+    }
+
+    if (!get_sensor_value(0, sn_sonar, &val)) {
+        printf("Failed to read sonar sensor\n");
+        return -1;
+    }
+
+    int distance_cm = val / 10;   // convert mm → cm
+    //printf("Distance: %d cm\n", distance_cm);
+
+    return distance_cm;
+}
+
+// Initialize sensors
 void initSensors(void) {
     int i;
     char s[256];
@@ -116,8 +128,13 @@ void initSensors(void) {
 
         if (ev3_sensor[i].type_inx == LEGO_EV3_GYRO && sn_gyro == DESC_LIMIT) {
             sn_gyro = i;
+            set_sensor_mode(sn_gyro, "GYRO-CAL");
+            Sleep(500); // robot must be stationary
+
             set_sensor_mode(sn_gyro, "GYRO-ANG");
-            printf("  -> Gyro sensor registered\n");
+            Sleep(50);
+
+            printf("  -> Gyro sensor callibrated and registered\n");
         }
 
         if (ev3_sensor[i].type_inx == LEGO_EV3_COLOR && sn_color == DESC_LIMIT) {
@@ -125,19 +142,31 @@ void initSensors(void) {
             set_sensor_mode(sn_color, "COL-COLOR");
             printf("  -> Color sensor registered\n");
         }
+
+        if (ev3_sensor[i].type_inx == LEGO_EV3_US && sn_sonar == DESC_LIMIT) {
+            sn_sonar = i;
+            set_sensor_mode(sn_sonar, "US-DIST-CM");
+            printf("  -> Sonar sensor registered\n");
+        }
+
+        if (ev3_sensor[i].type_inx == HT_NXT_COMPASS && sn_sonar == DESC_LIMIT) {
+            sn_compass = i;
+            printf("  -> Compass sensor registered\n");
+        }
     }
 
     /* --------- VALIDATION --------- */
 
     if (sn_gyro == DESC_LIMIT)
         printf("WARNING: Gyro sensor not found\n");
-    //else
-    //     sleep(5);   // gyro calibration
 
     if (sn_color == DESC_LIMIT)
         printf("WARNING: Color sensor not found\n");
 
-    printf("Out of here\n");
+    if (sn_sonar == DESC_LIMIT)
+        printf("WARNING: Sonar sensor not found\n");
+
+    printf("Sensor initialization complete.\n");
 }
 
 /* ===================== TOUCH & ULTRASONIC FUNCTIONS ===================== */
