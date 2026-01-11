@@ -18,7 +18,7 @@ void initSensors();
 int isTouchPressed(void);     // 1=pressed, 0=not pressed
 int get_compass_value(void);
 
-int init_ultrasonic(void)
+int init_ultrasonic(void);
 float read_ultrasonic_distance(void);
 int detect_obstacle_ahead(float threshold_cm);
 int init_touch_sensor(void);

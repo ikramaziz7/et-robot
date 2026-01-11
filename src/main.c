@@ -26,15 +26,14 @@ int main(int argc, const char *argv[])
     while (ev3_tacho_init() < 1) Sleep(1000);
     
     printf("Motors detected!\n");
-
+    
     init_motors();
     initSensors();
     resetGyro();
     Sleep(5000);
 
-    printf("Compass val: %d\n", get_compass_value());
-
-    // Init context struct
+    // // Init context struct
+    
     RobotContext ctx;
     ctx.current_state = STATE_STARTUP;
     ctx.previous_state = STATE_STARTUP;
@@ -52,9 +51,6 @@ int main(int argc, const char *argv[])
     ctx.dst.theta = 0;
     ctx.target_ore_index = 0;
     ctx.target_assigned = 0;
-
-    int initial_heading = get_compass_value();
-    box_position.bearing = normalize_angle(initial_heading + 180);
 
     srand(time(NULL));   // for random escape turns
     printf("Starting FSM\n");
@@ -88,8 +84,6 @@ int main(int argc, const char *argv[])
     ev3_uninit();
 
     printf("Match ended, robot stopped\n");
-    
-    stop_motors();
 
     return 0;
 }

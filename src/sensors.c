@@ -38,7 +38,7 @@ int compass_val;
 
 /* ---------------- SENSOR READERS ---------------- */
 
-char* getColor() {
+ColorType getColor() {
     int val;
 
     if (sn_color == DESC_LIMIT) {
@@ -70,10 +70,6 @@ int getGyroAngle(void) {
     return raw - gyro_zero;
 }
 
-int get_compass_value(void) {
-    if (!get_sensor_value(0, sn_compass, &compass_val)) return 0;
-    return compass_val;
-}
 
 int getDistanceCM(void) {
     int val;
@@ -149,10 +145,6 @@ void initSensors(void) {
             printf("  -> Sonar sensor registered\n");
         }
 
-        if (ev3_sensor[i].type_inx == HT_NXT_COMPASS && sn_sonar == DESC_LIMIT) {
-            sn_compass = i;
-            printf("  -> Compass sensor registered\n");
-        }
     }
 
     /* --------- VALIDATION --------- */

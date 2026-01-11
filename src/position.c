@@ -9,7 +9,7 @@
 
 // In cm
 Pose mineral_positions[] = {
-    {30.0f, -12.0f, 30, 320},   
+    {100.0f, 12.0f, 30, 320},   
     {30.0f, 12.0f, 30, 320},   
 };
 
@@ -22,12 +22,12 @@ float degrees_to_cm(int deg) {
 
 void update_pose(RobotContext *ctx, int d_left, int d_right, int gyro_deg)
 {
-    float dist_left  = degrees_to_cm(d_left);
-    float dist_right = degrees_to_cm(d_right);
+    float dist_left  = -degrees_to_cm(d_left);
+    float dist_right = -degrees_to_cm(d_right);
 
     float dist = (dist_left + dist_right) / 2.0f;
 
-    ctx->pose.bearing = get_compass_value();
+    //ctx->pose.bearing = get_compass_value();
 
     // Convert gyro degrees to radians
     float theta = gyro_deg * (M_PI / 180.0f);

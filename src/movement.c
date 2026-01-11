@@ -12,10 +12,14 @@
 
 static uint8_t sn_left = 0xFF;
 static uint8_t sn_right = 0xFF;
+static uint8_t sn_lift = 0xFF;
+static uint8_t sn_grabber = 0xFF;
 
 // Initialize motors once
 int init_motors(void) {
-    if (ev3_search_tacho_plugged_in(OUTPUT_C, 0, &sn_left, 0) &&
+    if (ev3_search_tacho_plugged_in(OUTPUT_A, 0, &sn_left, 0) &&
+        ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_lift, 0) &&
+        ev3_search_tacho_plugged_in(OUTPUT_C, 0, &sn_grabber, 0) &&
         ev3_search_tacho_plugged_in(OUTPUT_B, 0, &sn_right, 0)) {
         printf("Motors found: Left=C, Right=B\n");
         stop_motors();
@@ -29,6 +33,9 @@ void move(int direction, int speed_ratio) {
     if (sn_left == 0xFF || sn_right == 0xFF) {
         if (!init_motors()) return;
     }
+
+    // quick fix because we reversed motors
+    direction = -direction;
 
     if (speed_ratio < 0) speed_ratio = 0;
     if (speed_ratio > 100) speed_ratio = 100;
@@ -54,8 +61,12 @@ void stop_motors(void) {
 
     set_tacho_stop_action_inx(sn_left, TACHO_COAST);
     set_tacho_stop_action_inx(sn_right, TACHO_COAST);
+    set_tacho_stop_action_inx(sn_grabber, TACHO_COAST);
+    set_tacho_stop_action_inx(sn_lift, TACHO_COAST);
     set_tacho_command_inx(sn_left, TACHO_STOP);
     set_tacho_command_inx(sn_right, TACHO_STOP);
+    set_tacho_command_inx(sn_grabber, TACHO_STOP);
+    set_tacho_command_inx(sn_lift, TACHO_STOP);
 }
 
 // Turn on spot: -1=left, 1=right
@@ -164,6 +175,8 @@ void start_move_with_arc(RobotContext *ctx,
                          int speed_percent,
                          int target_degrees)
 {
+    direction = -direction;
+
     if (sn_left == 0xFF || sn_right == 0xFF) {
         if (!init_motors()) return;
     }
@@ -197,8 +210,8 @@ void start_move_with_arc(RobotContext *ctx,
     ctx->turn_start_gyro     = getGyroAngle();
 
     /* ---- Forward motion with curvature ---- */
-    set_tacho_speed_sp(sn_left,  max_speed * left_pct  / 100);
-    set_tacho_speed_sp(sn_right, max_speed * right_pct / 100);
+    set_tacho_speed_sp(sn_left,  -max_speed * left_pct  / 100);
+    set_tacho_speed_sp(sn_right, -max_speed * right_pct / 100);
 
     set_tacho_command_inx(sn_left,  TACHO_RUN_FOREVER);
     set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
@@ -225,6 +238,8 @@ void update_move_with_arc(RobotContext *ctx)
 }
 
 void start_turn(RobotContext *ctx, int degrees, int direction, int speed_percent) {
+    direction = -direction;
+
     if (sn_left == 0xFF || sn_right == 0xFF) {
         if (!init_motors()) return;
     }
@@ -304,64 +319,52 @@ void get_encoder_deltas(int *d_left, int *d_right)
 // Control the lift arm motor (raise/lower conveyor belt)
 // 1 to raise, -1 to lower, 0 to stop
 // TODO: will need to determine if we just have a preset time after raising to stop
-void control_lift_arm(int direction) {
-    uint8_t sn_lift;
+void control_lift_arm_degrees(int direction, int degrees) {
     int max_speed;
-    
-    // Search for motor on port C (orange motor)
-    if (!ev3_search_tacho_plugged_in(OUTPUT_C, 0, &sn_lift, 0)) {
-        printf("Lift arm motor NOT found on port C\n");
+
+    // Direction sanity check
+    if (direction != 1 && direction != -1) {
+        printf("Invalid direction\n");
         return;
     }
-    
-    if (direction == 0) {
-        // Stop the lift motor
-        set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
-        set_tacho_command_inx(sn_lift, TACHO_STOP);
-        printf("Lift arm stopped\n");
-        return;
-    }
-    
+
+    // Get max speed
     get_tacho_max_speed(sn_lift, &max_speed);
-    
-    // Set speed (and direction)
-    int speed = (max_speed / 2) * direction;
-    set_tacho_speed_sp(sn_lift, speed);
-    
-    // Run the motor
-    set_tacho_command_inx(sn_lift, TACHO_RUN_FOREVER);
-    
-    printf("Lift arm %s\n", direction > 0 ? "raising" : "lowering");
+    set_tacho_speed_sp(sn_lift, max_speed / 2);
+    // Set how far to move (degrees)
+    set_tacho_position_sp(sn_lift, degrees * direction);
+    // Optional: hold position after movement
+    set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
+    // Run motor to relative position
+    set_tacho_command_inx(sn_lift, TACHO_RUN_TO_REL_POS);
+
+    printf("Lift arm moving %d degrees %s\n",
+           degrees,
+           direction > 0 ? "up" : "down");
 }
 
 // Control the grabber motor (open/close)
 // 1 to close, -1 to open, 0 to stop
-void control_grabber(int direction) {
-    uint8_t sn_grabber;
+void control_grabber_degrees(int direction, int degrees) {
     int max_speed;
-    
-    // Search for motor on port D
-    if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_grabber, 0)) {
-        printf("Grabber motor NOT found on port D\n");
+
+    // Direction sanity check
+    if (direction != 1 && direction != -1) {
+        printf("Invalid direction\n");
         return;
     }
-    
-    if (direction == 0) {
-        // Stop the grabber motor
-        set_tacho_stop_action_inx(sn_grabber, TACHO_HOLD);
-        set_tacho_command_inx(sn_grabber, TACHO_STOP);
-        printf("Grabber stopped\n");
-        return;
-    }
-    
+
+    // Get max speed
     get_tacho_max_speed(sn_grabber, &max_speed);
-    
-    // Set speed (and direction))
-    int speed = (max_speed / 3) * direction;
-    set_tacho_speed_sp(sn_grabber, speed);
-    
-    // Run the motor
-    set_tacho_command_inx(sn_grabber, TACHO_RUN_FOREVER);
-    
-    printf("Grabber %s\n", direction > 0 ? "closing" : "opening");
+    set_tacho_speed_sp(sn_grabber, max_speed / 2);
+    // Set how far to move (degrees)
+    set_tacho_position_sp(sn_grabber, degrees * direction);
+    // Optional: hold position after movement
+    set_tacho_stop_action_inx(sn_grabber, TACHO_HOLD);
+    // Run motor to relative position
+    set_tacho_command_inx(sn_grabber, TACHO_RUN_TO_REL_POS);
+
+    printf("Grab arm moving %d degrees %s\n",
+           degrees,
+           direction > 0 ? "up" : "down");
 }

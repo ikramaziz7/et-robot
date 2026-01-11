@@ -6,7 +6,7 @@
 #include "time_utils.h"
 
 #define START_SPEED 5
-#define EXPLORE_SPEED      5  // percent of max speed
+#define EXPLORE_SPEED      15  // percent of max speed
 #define AVOID_SPEED      15  // percent of max speed
 #define SONAR_THRESHOLD    15  // cm for obstacle
 #define MINERAL_DIST_TARGET_THRESHOLD 2.5f
@@ -32,16 +32,29 @@ int smooth_align_turn = 0;
 static void state_startup(RobotContext *ctx) {
     /* Entry actions */
     if (ctx->state_just_entered) {
+        printf("[STATE] STARTUP\n");
         move(1, START_SPEED);
         ctx->state_just_entered = 0;
         ctx->dst=mineral_positions[ctx->target_ore_index];
     }
 
+    // For the test sessions, when the robot is in front of the object
+    int color = getColor();
+    if (color == COLOR_YELLOW || color == COLOR_BLUE || color == COLOR_RED) {
+        ctx->target_mineral_color = color;
+        stop_motors();
+        change_state(ctx, STATE_APPROACH_MINERAL);
+        return;
+    }
+    change_state(ctx, STATE_EXPLORE);
+
+    //change_state(ctx, STATE_APPROACH_MINERAL);
+
     /* Transition condition */
-    if (millis() - ctx->state_entry_time_ms > 2000) {
+    /*if (millis() - ctx->state_entry_time_ms > 2000) {
         stop_motors();
         change_state(ctx, STATE_ALIGN_TARGET_POSE);
-    }
+    }*/    
 }
 
 void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
@@ -59,7 +72,7 @@ void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
             start_turn(ctx, angle, direction, EXPLORE_SPEED);
         }
         else {
-            start_move_with_arc(ctx, -direction, EXPLORE_SPEED, angle);
+            start_move_with_arc(ctx, direction, EXPLORE_SPEED, angle);
         }
     } else {
         if (!smooth_align_turn) {
@@ -77,8 +90,7 @@ static void state_align_target_pose(RobotContext *ctx) {
         ctx->state_just_entered = 0;
         ctx->turn_active = 0;
         ctx->state_entry_time_ms = millis();
-    } 
-    
+    }     
 
     int distance = getDistanceCM();
     if (distance > 0 && distance < SONAR_THRESHOLD) {
@@ -101,7 +113,6 @@ static void state_align_target_pose(RobotContext *ctx) {
 }
 
 static void state_explore(RobotContext *ctx) {
-
     /* Entry actions */
     if (ctx->state_just_entered) {
         printf("[STATE] EXPLORE\n");
@@ -131,13 +142,6 @@ static void state_explore(RobotContext *ctx) {
         return;
     }
 
-    if (isTouchPressed()) {
-        stop_motors();
-        ctx->previous_state = ctx->current_state;
-        change_state(ctx, STATE_AVOID_OBSTACLE);
-        return;
-    }
-
     if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
         smooth_align_turn = 0;
         change_state(ctx, STATE_ALIGN_TARGET_POSE);
@@ -153,32 +157,27 @@ static void state_explore(RobotContext *ctx) {
 
 static void state_approach_mineral(RobotContext *ctx) {
     if (ctx->state_just_entered) {
+        move(1, EXPLORE_SPEED);
         printf("[STATE] APPROACH MINERAL\n");
         ctx->state_just_entered = 0;
     }
-    stop_motors();
-    change_state(ctx, STATE_PICKUP_MINERAL);
+
+    if (millis() - ctx->state_entry_time_ms >= 2000) {
+        stop_motors();
+        change_state(ctx, STATE_PICKUP_MINERAL);
+    }
 }
 
 static void state_pickup_mineral(RobotContext *ctx) {
-    unsigned long elapsed = millis() - ctx->state_entry_time_ms;
-    
     if (ctx->state_just_entered) {
         printf("[STATE] PICKUP MINERAL\n");
         ctx->state_just_entered = 0;
-        
-        control_grabber(1); 
     }
 
-    if (elapsed > 1500 && elapsed <= 2500) {
-        control_grabber(0);
-        control_lift_arm(1);
-    }
-    
-    if (elapsed > 2500) {
-        control_lift_arm(0);
-        change_state(ctx, STATE_RETURN_HOME);
-    }
+    control_grabber_degrees(-1, 180);
+    Sleep(2000);
+    control_lift_arm_degrees(1, 415);
+    change_state(ctx, STATE_END_MATCH);
 }
 
 static void state_return_home(RobotContext *ctx) {
@@ -230,22 +229,9 @@ static void state_drop_mineral(RobotContext *ctx) {
         ctx->target_ore_index++;
         
         // Open grabber to release mineral
-        control_grabber(-1); 
-    }
-
-    if (elapsed > 2000 && elapsed <= 3000) {
-        control_grabber(0);
-        move(-1, EXPLORE_SPEED);
-    }
-    
-    // Grabber moves backwards so there is room to lower the lift
-    if (elapsed > 3000) {
-        stop_motors();
-        control_lift_arm(-1);
-        // TODO: decide how long to lower lift or set defaults
-        Sleep(500); 
-        control_lift_arm(0); 
-        change_state(ctx, STATE_EXPLORE);
+        control_grabber_degrees(1, 180);
+        
+        //control_grabber(-1); 
     }
 }
 
