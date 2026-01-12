@@ -172,14 +172,19 @@ static void state_pickup_mineral(RobotContext *ctx) {
     if (ctx->state_just_entered) {
         printf("[STATE] PICKUP MINERAL\n");
         ctx->state_just_entered = 0;
+        
+        // Close grabber first
+        control_grabber_degrees(1, 180);
+        Sleep(1000);  // Wait for grabber to close
+        
+        // Then lift up
+        control_lift_arm_degrees(1, 415);
+        Sleep(1000);  // Wait for lift to complete
+        
+        // Now go back home
+        change_state(ctx, STATE_RETURN_HOME);
     }
-
-    control_grabber_degrees(-1, 180);
-    Sleep(2000);
-    control_lift_arm_degrees(1, 415);
-    change_state(ctx, STATE_END_MATCH);
 }
-
 static void state_return_home(RobotContext *ctx) {
     if (ctx->state_just_entered) {
         printf("[STATE] RETURN HOME\n");
@@ -220,8 +225,6 @@ static void state_return_home(RobotContext *ctx) {
 }
 
 static void state_drop_mineral(RobotContext *ctx) {
-    unsigned long elapsed = millis() - ctx->state_entry_time_ms;
-    
     if (ctx->state_just_entered) {
         printf("[STATE] DROP MINERAL\n");
         ctx->state_just_entered = 0;
@@ -229,9 +232,20 @@ static void state_drop_mineral(RobotContext *ctx) {
         ctx->target_ore_index++;
         
         // Open grabber to release mineral
-        control_grabber_degrees(1, 180);
+        control_grabber_degrees(-1, 180);
+        Sleep(1000);  // Wait for mineral to drop
         
-        //control_grabber(-1); 
+        // Lower lift arm back down
+        control_lift_arm_degrees(-1, 415);
+        Sleep(1000);
+        
+        // Move back slightly
+        move(-1, EXPLORE_SPEED);
+        Sleep(500);
+        stop_motors();
+        
+        // Continue exploring
+        change_state(ctx, STATE_EXPLORE);
     }
 }
 
