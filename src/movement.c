@@ -343,28 +343,142 @@ void control_lift_arm_degrees(int direction, int degrees) {
            direction > 0 ? "up" : "down");
 }
 
-// Control the grabber motor (open/close)
-// 1 to close, -1 to open, 0 to stop
-void control_grabber_degrees(int direction, int degrees) {
-    int max_speed;
 
-    // Direction sanity check
-    if (direction != 1 && direction != -1) {
-        printf("Invalid direction\n");
+
+/**
+ * Control grabber with specific degree rotation
+ * @param direction: 1 to close, -1 to open
+ * @param degrees: rotation amount (e.g., 180 degrees)
+ */
+void control_grabber_degrees(int direction, int degrees) {
+    uint8_t sn_grabber;
+    int max_speed;
+    
+    // Search for motor on port D (grabber motor)
+    if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_grabber, 0)) {
+        printf("Grabber motor NOT found on port D\n");
         return;
     }
-
-    // Get max speed
+    
     get_tacho_max_speed(sn_grabber, &max_speed);
-    set_tacho_speed_sp(sn_grabber, max_speed / 2);
-    // Set how far to move (degrees)
-    set_tacho_position_sp(sn_grabber, degrees * direction);
-    // Optional: hold position after movement
+    
+    // Set stop action to hold position
     set_tacho_stop_action_inx(sn_grabber, TACHO_HOLD);
-    // Run motor to relative position
+    
+    // Set speed (adjust speed as needed - currently 1/3 of max)
+    int speed = max_speed / 3;
+    set_tacho_speed_sp(sn_grabber, speed);
+    
+    // Set position target (negative direction means open, positive means close)
+    set_tacho_position_sp(sn_grabber, degrees * direction);
+    
+    // Execute movement
     set_tacho_command_inx(sn_grabber, TACHO_RUN_TO_REL_POS);
+    
+    // Wait until movement complete
+    FLAGS_T state;
+    do {
+        get_tacho_state_flags(sn_grabber, &state);
+        Sleep(10);
+    } while (state != 0);
+    
+    printf("Grabber %s by %d degrees\n", 
+           direction > 0 ? "closed" : "opened", degrees);
+}
 
-    printf("Grab arm moving %d degrees %s\n",
-           degrees,
-           direction > 0 ? "up" : "down");
+/**
+ * Control lift arm with specific degree rotation
+ * @param direction: 1 to raise, -1 to lower
+ * @param degrees: rotation amount (e.g., 415 degrees to lift over box)
+ */
+void control_lift_arm_degrees(int direction, int degrees) {
+    uint8_t sn_lift;
+    int max_speed;
+    
+    // Search for motor on port A or C (lift arm motor)
+    if (!ev3_search_tacho_plugged_in(OUTPUT_A, 0, &sn_lift, 0)) {
+        printf("Lift arm motor NOT found on port A\n");
+        return;
+    }
+    
+    get_tacho_max_speed(sn_lift, &max_speed);
+    
+    // Set stop action to hold position
+    set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
+    
+    // Set speed (half of max speed for controlled movement)
+    int speed = max_speed / 2;
+    set_tacho_speed_sp(sn_lift, speed);
+    
+    // Set position target
+    set_tacho_position_sp(sn_lift, degrees * direction);
+    
+    // Execute movement
+    set_tacho_command_inx(sn_lift, TACHO_RUN_TO_REL_POS);
+    
+    // Wait until movement complete
+    FLAGS_T state;
+    do {
+        get_tacho_state_flags(sn_lift, &state);
+        Sleep(10);
+    } while (state != 0);
+    
+    printf("Lift arm %s by %d degrees\n", 
+           direction > 0 ? "raised" : "lowered", degrees);
+}
+
+/**
+ * Continuous control for grabber (for testing)
+ * @param direction: 1 to close, -1 to open, 0 to stop
+ */
+void control_grabber(int direction) {
+    uint8_t sn_grabber;
+    int max_speed;
+    
+    if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_grabber, 0)) {
+        printf("Grabber motor NOT found on port D\n");
+        return;
+    }
+    
+    if (direction == 0) {
+        set_tacho_stop_action_inx(sn_grabber, TACHO_HOLD);
+        set_tacho_command_inx(sn_grabber, TACHO_STOP);
+        printf("Grabber stopped\n");
+        return;
+    }
+    
+    get_tacho_max_speed(sn_grabber, &max_speed);
+    int speed = (max_speed / 3) * direction;
+    set_tacho_speed_sp(sn_grabber, speed);
+    set_tacho_command_inx(sn_grabber, TACHO_RUN_FOREVER);
+    
+    printf("Grabber %s\n", direction > 0 ? "closing" : "opening");
+}
+
+/**
+ * Continuous control for lift arm (for testing)
+ * @param direction: 1 to raise, -1 to lower, 0 to stop
+ */
+void control_lift_arm(int direction) {
+    uint8_t sn_lift;
+    int max_speed;
+    
+    if (!ev3_search_tacho_plugged_in(OUTPUT_A, 0, &sn_lift, 0)) {
+        printf("Lift arm motor NOT found on port A\n");
+        return;
+    }
+    
+    if (direction == 0) {
+        set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
+        set_tacho_command_inx(sn_lift, TACHO_STOP);
+        printf("Lift arm stopped\n");
+        return;
+    }
+    
+    get_tacho_max_speed(sn_lift, &max_speed);
+    int speed = (max_speed / 2) * direction;
+    set_tacho_speed_sp(sn_lift, speed);
+    set_tacho_command_inx(sn_lift, TACHO_RUN_FOREVER);
+    
+    printf("Lift arm %s\n", direction > 0 ? "raising" : "lowering");
 }
