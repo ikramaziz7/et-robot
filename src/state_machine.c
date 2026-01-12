@@ -174,11 +174,11 @@ static void state_pickup_mineral(RobotContext *ctx) {
         ctx->state_just_entered = 0;
         
         // Close grabber first
-        control_grabber_degrees(1, 180);
+        control_grabber_degrees(1, 220);
         Sleep(1000);  // Wait for grabber to close
         
         // Then lift up
-        control_lift_arm_degrees(1, 415);
+        control_lift_arm_degrees(1, 450);
         Sleep(1000);  // Wait for lift to complete
         
         // Now go back home
