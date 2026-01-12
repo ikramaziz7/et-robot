@@ -13,8 +13,6 @@ Replace `<project path>` with the absolute path to your project folder.
 
 ```bash
 sudo docker run \
-    -e LOCAL_USER_ID=id \
-    -u $USER \
     --rm -it \
     -v <project path>:/src \
     -w /src \
