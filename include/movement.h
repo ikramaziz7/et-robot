@@ -17,5 +17,13 @@ void update_move_with_arc(RobotContext *ctx);
 void update_turn(RobotContext *ctx);
 void start_turn(RobotContext *ctx, int degrees, int direction, int speed_percent);
 void get_encoder_deltas(int *d_left, int *d_right); // For odemtry
+// Precise degree control
+void control_grabber_degrees(int direction, int degrees);
+void control_lift_arm_degrees(int direction, int degrees);
+
+// Continuous control (for testing)
+void control_grabber(int direction);
+void control_lift_arm(int direction);
+
 
 #endif // MOVEMENT_H
