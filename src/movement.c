@@ -316,34 +316,6 @@ void get_encoder_deltas(int *d_left, int *d_right)
     last_right = cur_right;
 }
 
-// Control the lift arm motor (raise/lower conveyor belt)
-// 1 to raise, -1 to lower, 0 to stop
-// TODO: will need to determine if we just have a preset time after raising to stop
-void control_lift_arm_degrees(int direction, int degrees) {
-    int max_speed;
-
-    // Direction sanity check
-    if (direction != 1 && direction != -1) {
-        printf("Invalid direction\n");
-        return;
-    }
-
-    // Get max speed
-    get_tacho_max_speed(sn_lift, &max_speed);
-    set_tacho_speed_sp(sn_lift, max_speed / 2);
-    // Set how far to move (degrees)
-    set_tacho_position_sp(sn_lift, degrees * direction);
-    // Optional: hold position after movement
-    set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
-    // Run motor to relative position
-    set_tacho_command_inx(sn_lift, TACHO_RUN_TO_REL_POS);
-
-    printf("Lift arm moving %d degrees %s\n",
-           degrees,
-           direction > 0 ? "up" : "down");
-}
-
-
 
 /**
  * Control grabber with specific degree rotation
