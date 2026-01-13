@@ -53,7 +53,7 @@ ColorType getColor() {
 
     color_val = val;  // optional, if you still want to store last value
 
-    printf("Color detected: %d\n", val);  // optional debug
+    //printf("Color detected: %d\n", val);  // optional debug
     return (ColorType)val;
 }
 
