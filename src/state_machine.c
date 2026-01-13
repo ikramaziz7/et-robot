@@ -100,7 +100,12 @@ static void state_align_target_pose(RobotContext *ctx) {
     if (distance > 0 && distance < SONAR_THRESHOLD) {
         stop_motors();
         ctx->previous_state = ctx->current_state;
-        change_state(ctx, STATE_AVOID_OBSTACLE);
+        if (curr_moving_state == STATE_RETURN_HOME) {
+            change_state(ctx, STATE_DROP_MINERAL);
+        } 
+        else {
+            change_state(ctx, STATE_APPROACH_MINERAL);
+        }
         return;
     }
 
@@ -138,13 +143,13 @@ static void state_explore(RobotContext *ctx) {
     }
 
     // Check for obstacles
-    int distance = getDistanceCM();
-    if (distance > 0 && distance < SONAR_THRESHOLD) {
-        stop_motors();
-        ctx->previous_state = ctx->current_state;
-        change_state(ctx, STATE_AVOID_OBSTACLE);
-        return;
-    }
+    //int distance = getDistanceCM();
+    //if (distance > 0 && distance < SONAR_THRESHOLD) {
+    //    stop_motors();
+    //    ctx->previous_state = ctx->current_state;
+    //    change_state(ctx, STATE_APPROACH_MINERAL);
+    //    return;
+    //}
 
     if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
         smooth_align_turn = 0;
@@ -198,24 +203,18 @@ static void state_return_home(RobotContext *ctx) {
         smooth_align_turn = 0;
         ctx->state_just_entered = 0;
         ctx->dst=box_position;
+        change_state(ctx, STATE_ALIGN_TARGET_POSE);
     }
     if (millis() - ctx->state_entry_time_ms > 20000) {
         stop_motors();
     }
 
     float distance_to_box = distance_to_target(ctx->pose, box_position);
-    if (distance_to_box < MINERAL_DIST_TARGET_THRESHOLD) {
+    int distance = getDistanceCM();
+    if (distance_to_box < MINERAL_DIST_TARGET_THRESHOLD && 
+        distance > 0 && distance < SONAR_THRESHOLD) {
         change_state(ctx, STATE_DROP_MINERAL);
     }
-
-    int distance = getDistanceCM();
-    if (distance > 0 && distance < SONAR_THRESHOLD) {
-        stop_motors();
-        ctx->previous_state = ctx->current_state;
-        change_state(ctx, STATE_AVOID_OBSTACLE);
-        return;
-    }
-
 
     if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
         smooth_align_turn = 0;
