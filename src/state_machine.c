@@ -14,6 +14,10 @@
 #define ALIGN_TARGET_ADJUST_INTERVAL 3000
 #define ALIGN_DEGREES_TOLERANCE 2
 #define Sleep( msec ) usleep(( msec ) * 1000 )
+#define LIFT_DEGREES 500
+#define GRABBER_DEGREES 100 
+#define GRABBER_CLOSEDIR -1
+#define LIFT_LIFTDIR 1
 
 static void state_startup(RobotContext *ctx);
 static void state_explore(RobotContext *ctx);
@@ -40,7 +44,7 @@ static void state_startup(RobotContext *ctx) {
 
     // For the test sessions, when the robot is in front of the object
     int color = getColor();
-    if (color == COLOR_YELLOW || color == COLOR_BLUE || color == COLOR_RED) {
+    if (color == COLOR_RED) {
         ctx->target_mineral_color = color;
         stop_motors();
         change_state(ctx, STATE_APPROACH_MINERAL);
@@ -126,7 +130,7 @@ static void state_explore(RobotContext *ctx) {
 
     // Check for minerals
     int color = getColor();
-    if (color == COLOR_YELLOW || color == COLOR_BLUE || color == COLOR_RED) {
+    if (color == COLOR_RED) {
         ctx->target_mineral_color = color;
         stop_motors();
         change_state(ctx, STATE_APPROACH_MINERAL);
@@ -174,17 +178,18 @@ static void state_pickup_mineral(RobotContext *ctx) {
         ctx->state_just_entered = 0;
         
         // Close grabber first
-        control_grabber_degrees(1, 220);
+        control_grabber_degrees(GRABBER_CLOSEDIR, GRABBER_DEGREES);
         Sleep(1000);  // Wait for grabber to close
         
         // Then lift up
-        control_lift_arm_degrees(1, 450);
+        control_lift_arm_degrees(LIFT_LIFTDIR, LIFT_DEGREES);
         Sleep(1000);  // Wait for lift to complete
         
         // Now go back home
         change_state(ctx, STATE_RETURN_HOME);
     }
 }
+
 static void state_return_home(RobotContext *ctx) {
     if (ctx->state_just_entered) {
         printf("[STATE] RETURN HOME\n");
@@ -231,18 +236,19 @@ static void state_drop_mineral(RobotContext *ctx) {
         smooth_align_turn = 0;
         ctx->target_ore_index++;
         
+
         // Open grabber to release mineral
-        control_grabber_degrees(-1, 180);
+        control_grabber_degrees(GRABBER_CLOSEDIR * -1, GRABBER_DEGREES);
         Sleep(1000);  // Wait for mineral to drop
-        
-        // Lower lift arm back down
-        control_lift_arm_degrees(-1, 415);
-        Sleep(1000);
         
         // Move back slightly
         move(-1, EXPLORE_SPEED);
-        Sleep(500);
+        Sleep(1000);
         stop_motors();
+
+        // Lower lift arm back down
+        control_lift_arm_degrees(LIFT_LIFTDIR * -1, LIFT_DEGREES);
+        Sleep(1000);
         
         // Continue exploring
         change_state(ctx, STATE_EXPLORE);

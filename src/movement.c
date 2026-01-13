@@ -327,7 +327,7 @@ void control_grabber_degrees(int direction, int degrees) {
     int max_speed;
     
     // Search for motor on port D (grabber motor)
-    if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_grabber, 0)) {
+    if (!ev3_search_tacho_plugged_in(OUTPUT_C, 0, &sn_grabber, 0)) {
         printf("Grabber motor NOT found on port D\n");
         return;
     }
@@ -348,11 +348,11 @@ void control_grabber_degrees(int direction, int degrees) {
     set_tacho_command_inx(sn_grabber, TACHO_RUN_TO_REL_POS);
     
     // Wait until movement complete
-    FLAGS_T state;
-    do {
-        get_tacho_state_flags(sn_grabber, &state);
-        Sleep(10);
-    } while (state != 0);
+    // FLAGS_T state;
+    // do {
+    //     get_tacho_state_flags(sn_grabber, &state);
+    //     Sleep(10);
+    // } while (state != 0);
     
     printf("Grabber %s by %d degrees\n", 
            direction > 0 ? "closed" : "opened", degrees);
@@ -368,7 +368,7 @@ void control_lift_arm_degrees(int direction, int degrees) {
     int max_speed;
     
     // Search for motor on port A or C (lift arm motor)
-    if (!ev3_search_tacho_plugged_in(OUTPUT_A, 0, &sn_lift, 0)) {
+    if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_lift, 0)) {
         printf("Lift arm motor NOT found on port A\n");
         return;
     }
@@ -389,11 +389,11 @@ void control_lift_arm_degrees(int direction, int degrees) {
     set_tacho_command_inx(sn_lift, TACHO_RUN_TO_REL_POS);
     
     // Wait until movement complete
-    FLAGS_T state;
-    do {
-        get_tacho_state_flags(sn_lift, &state);
-        Sleep(10);
-    } while (state != 0);
+    // FLAGS_T state;
+    // do {
+    //     get_tacho_state_flags(sn_lift, &state);
+    //     Sleep(10);
+    // } while (state != 0);
     
     printf("Lift arm %s by %d degrees\n", 
            direction > 0 ? "raised" : "lowered", degrees);
