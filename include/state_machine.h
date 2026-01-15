@@ -41,6 +41,7 @@ typedef struct RobotContext {
     int turn_start_left_pos;  // encoder values at start
     int turn_start_right_pos;
     int turn_start_gyro;          // gyro angle at start
+    int aligned_home_initial;
 
     int target_ore_index;
     int target_assigned;

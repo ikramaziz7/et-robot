@@ -7,12 +7,13 @@
 #include <unistd.h>
 #include "state_machine.h"
 #include "position.h"
+#include <stdlib.h>
 
 #define Sleep( msec ) usleep(( msec ) * 1000 )
 
 int main(int argc, const char *argv[])
 {
-
+    //speak("ET phone home");
     // Initialize EV3
     if (ev3_init() == -1) {
         printf("Failed to initialize EV3\n");
@@ -41,29 +42,39 @@ int main(int argc, const char *argv[])
     resetGyro();
     Sleep(5000);
 
-    
+    //turn_degrees_speed(1000, 1, 70);
     if (strcmp(argv[1], "simple1") == 0) {
         printf("Mode selected: Simple 1 mineral\n");
         bool isMineralPickedUp = false;
         bool isMineralDropped = false;
         
         while (!isMineralDropped) {
+            if (isMineralDropped) {
+                break;
+            }
+
             int distance = getDistanceCM();
             printf("Distance: %d\n", distance);
             if (!isMineralPickedUp) {
-                move(1, 40);
+                move(1, 15);
                 if (distance <= 4) {
                     isMineralPickedUp = true;
                     stop_motors();
                     control_grabber_degrees(GRABBER_CLOSEDIR, GRABBER_DEGREES);
                     Sleep(1000);  // Wait for grabber to close
-                    
+
                     // Then lift up
                     control_lift_arm_degrees(LIFT_LIFTDIR, LIFT_DEGREES);
                 }
             }
             else if (isMineralPickedUp) {
-
+                turn_degrees(400, 1);
+                move(1, 15);
+                if (distance <= 4) {
+                    stop_motors();
+                    control_grabber_degrees(GRABBER_CLOSEDIR * -1, GRABBER_DEGREES);
+                    isMineralDropped = true;
+                }
             }
         }
     } 
@@ -86,6 +97,7 @@ int main(int argc, const char *argv[])
         ctx.dst.theta = 0;
         ctx.target_ore_index = 0;
         ctx.target_assigned = 0;
+        ctx.aligned_home_initial = 0;
 
         srand(time(NULL));   // for random escape turns
         printf("Starting FSM\n");
@@ -114,7 +126,6 @@ int main(int argc, const char *argv[])
 
             Sleep(20);   // 50 Hz update rate
         }
-
 
         ev3_uninit();
 

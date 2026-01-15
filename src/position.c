@@ -4,16 +4,16 @@
 #include "state_machine.h"
 
 #define M_PI 3.14159265358979323846
-#define WHEEL_DIAMETER_CM 3
+#define WHEEL_DIAMETER_CM 7.5
 #define WHEEL_CIRC_CM (3.14159 * WHEEL_DIAMETER_CM)
 
 // In cm
 Pose mineral_positions[] = {
-    {100.0f, 12.0f, 30, 320},   
+    {60.0f, 00.0f, 30, 320},   
     {30.0f, 12.0f, 30, 320},   
 };
 
-Pose box_position = {0.0f, 0.0f, 0, -1};
+Pose box_position = {0.0f, -30.0f, 0, -1};
 
 // Convert encoder degrees to cm
 float degrees_to_cm(int deg) {
@@ -47,12 +47,10 @@ void print_pose(const Pose *p)
         return;
     }
 
-    printf("Pose -> X: %.2f cm | Y: %.2f cm | Theta: %d deg | Compass heading: %d | Box bearing: %d\n",
+    printf("Pose -> X: %.2f cm | Y: %.2f cm | Theta: %d deg\n",
            p->x,
            p->y,
-           p->theta,
-           p->bearing,
-           box_position.bearing);
+           p->theta);
 }
 
 void print_distance_to_target(Pose current, Pose target) {

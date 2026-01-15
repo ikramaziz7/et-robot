@@ -6,10 +6,10 @@
 #include "time_utils.h"
 
 #define START_SPEED 5
-#define EXPLORE_SPEED      15  // percent of max speed
+#define EXPLORE_SPEED      5  // percent of max speed
 #define AVOID_SPEED      15  // percent of max speed
 #define SONAR_THRESHOLD    15  // cm for obstacle
-#define MINERAL_DIST_TARGET_THRESHOLD 2.5f
+#define MINERAL_DIST_TARGET_THRESHOLD 5
 #define ALIGN_TARGET_INTERVAL 10000
 #define ALIGN_TARGET_ADJUST_INTERVAL 3000
 #define ALIGN_DEGREES_TOLERANCE 2
@@ -38,23 +38,7 @@ static void state_startup(RobotContext *ctx) {
         ctx->dst=mineral_positions[ctx->target_ore_index];
     }
 
-    // For the test sessions, when the robot is in front of the object
-    int color = getColor();
-    if (color == COLOR_RED) {
-        ctx->target_mineral_color = color;
-        stop_motors();
-        change_state(ctx, STATE_APPROACH_MINERAL);
-        return;
-    }
-    change_state(ctx, STATE_EXPLORE);
-
-    //change_state(ctx, STATE_APPROACH_MINERAL);
-
-    /* Transition condition */
-    /*if (millis() - ctx->state_entry_time_ms > 2000) {
-        stop_motors();
-        change_state(ctx, STATE_ALIGN_TARGET_POSE);
-    }*/    
+    change_state(ctx, STATE_EXPLORE); 
 }
 
 void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
@@ -92,8 +76,10 @@ static void state_align_target_pose(RobotContext *ctx) {
         ctx->state_entry_time_ms = millis();
     }     
 
+    float distance_to_dst = distance_to_target(ctx->pose, ctx->dst);
     int distance = getDistanceCM();
-    if (distance > 0 && distance < SONAR_THRESHOLD) {
+    if (distance_to_dst < MINERAL_DIST_TARGET_THRESHOLD &&
+        distance > 0 && distance < SONAR_THRESHOLD) {
         stop_motors();
         ctx->previous_state = ctx->current_state;
         if (curr_moving_state == STATE_RETURN_HOME) {
@@ -130,22 +116,22 @@ static void state_explore(RobotContext *ctx) {
     }
 
     // Check for minerals
-    int color = getColor();
-    if (color == COLOR_RED) {
-        ctx->target_mineral_color = color;
-        stop_motors();
-        change_state(ctx, STATE_APPROACH_MINERAL);
-        return;
-    }
+    // int color = getColor();
+    // if (color == COLOR_RED) {
+    //     ctx->target_mineral_color = color;
+    //     stop_motors();
+    //     change_state(ctx, STATE_APPROACH_MINERAL);
+    //     return;
+    // }
 
     // Check for obstacles
-    //int distance = getDistanceCM();
-    //if (distance > 0 && distance < SONAR_THRESHOLD) {
-    //    stop_motors();
-    //    ctx->previous_state = ctx->current_state;
-    //    change_state(ctx, STATE_APPROACH_MINERAL);
-    //    return;
-    //}
+    int distance = getDistanceCM();
+    if (distance > 0 && distance < MINERAL_DIST_TARGET_THRESHOLD) {
+       stop_motors();
+       ctx->previous_state = ctx->current_state;
+       change_state(ctx, STATE_APPROACH_MINERAL);
+       return;
+    }
 
     if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
         smooth_align_turn = 0;
@@ -191,15 +177,26 @@ static void state_pickup_mineral(RobotContext *ctx) {
     }
 }
 
+static void speak(const char *phrase) {
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd),
+             "sh -c \"(command -v espeak-ng >/dev/null 2>&1 && "
+             "espeak-ng -a 150 -s 140 '%s') || "
+             "(command -v espeak >/dev/null 2>&1 && "
+             "espeak -a 150 -s 140 '%s')\" >/dev/null 2>&1 &",
+             phrase, phrase);
+    system(cmd);
+}
+
 static void state_return_home(RobotContext *ctx) {
     if (ctx->state_just_entered) {
         printf("[STATE] RETURN HOME\n");
+        //speak("ET phone home");
         curr_moving_state = STATE_RETURN_HOME;
         move(1, EXPLORE_SPEED);
         smooth_align_turn = 0;
         ctx->state_just_entered = 0;
         ctx->dst=box_position;
-        change_state(ctx, STATE_ALIGN_TARGET_POSE);
     }
     if (millis() - ctx->state_entry_time_ms > 20000) {
         stop_motors();
@@ -207,15 +204,17 @@ static void state_return_home(RobotContext *ctx) {
 
     float distance_to_box = distance_to_target(ctx->pose, box_position);
     int distance = getDistanceCM();
-    if (distance_to_box < MINERAL_DIST_TARGET_THRESHOLD && 
+    if (distance_to_box < 15 && 
         distance > 0 && distance < SONAR_THRESHOLD) {
         change_state(ctx, STATE_DROP_MINERAL);
     }
 
-    if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
+    if (!ctx->aligned_home_initial || 
+        (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL)) {
+        ctx->aligned_home_initial = 1;
+        ctx->state_align_time_ms = millis();
         smooth_align_turn = 0;
         change_state(ctx, STATE_ALIGN_TARGET_POSE);
-        ctx->state_align_time_ms = millis();
     }
     else if (millis() - ctx->state_align_adjust_time_ms > ALIGN_TARGET_ADJUST_INTERVAL) {
         smooth_align_turn = 1;
