@@ -14,10 +14,6 @@
 #define ALIGN_TARGET_ADJUST_INTERVAL 3000
 #define ALIGN_DEGREES_TOLERANCE 2
 #define Sleep( msec ) usleep(( msec ) * 1000 )
-#define LIFT_DEGREES 500
-#define GRABBER_DEGREES 100 
-#define GRABBER_CLOSEDIR -1
-#define LIFT_LIFTDIR 1
 
 static void state_startup(RobotContext *ctx);
 static void state_explore(RobotContext *ctx);

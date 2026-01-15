@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include "state_machine.h"
 
+#define LIFT_DEGREES 500
+#define GRABBER_DEGREES 100 
+#define GRABBER_CLOSEDIR -1
+#define LIFT_LIFTDIR 1
+
 void move(int direction, int speed_ratio);  // 1 for forward, -1 for backward
 void turn(int direction, int speed_ratio);  // -1 for left, 1 for right
 void stop_motors();

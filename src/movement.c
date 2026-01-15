@@ -46,7 +46,7 @@ void move(int direction, int speed_ratio) {
     int speed = (max_speed * speed_ratio / 100) * direction;
 
     set_tacho_speed_sp(sn_left, speed);
-    set_tacho_speed_sp(sn_right, speed);
+    set_tacho_speed_sp(sn_right, speed * 0.8);
 
     set_tacho_command_inx(sn_left, TACHO_RUN_FOREVER);
     set_tacho_command_inx(sn_right, TACHO_RUN_FOREVER);
