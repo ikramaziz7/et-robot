@@ -492,238 +492,170 @@
 
         <section id="algorithms">
             <h2>Algorithms & Strategy</h2>
-            
-            <h3 style="margin-top: 1rem;">1. State Machine (Main Control Algorithm)</h3>
-            <p style="color: #aaa; margin-bottom: 1.5rem;">The robot operates as a finite state machine, switching between different behavioral states based on sensor inputs and game conditions.</p>
-            
-            <h3 style="margin-top: 3rem;">4. Supporting Algorithms</h3>
-                <h4>State Definitions</h4>
-                <p><strong>STARTUP:</strong> Initialize robot, move forward briefly to clear starting zone<br>
-                <strong>ALIGN_TARGET_POSE:</strong> Calculate heading to target and rotate robot to face it<br>
-                <strong>EXPLORE:</strong> Move toward target mineral while scanning for ores with color sensor<br>
-                <strong>APPROACH_MINERAL:</strong> Stop when mineral detected by color sensor<br>
-                <strong>PICKUP_MINERAL:</strong> Execute gripper sequence to collect ore<br>
-                <strong>RETURN_HOME:</strong> Navigate back to home zone using position tracking<br>
-                <strong>DROP_MINERAL:</strong> Release ore into collection box, increment to next target<br>
-                <strong>AVOID_OBSTACLE:</strong> Back up and recalculate path when obstacle detected<br>
-                <strong>END_MATCH:</strong> Stop all motors at game end</p>
-            </div>
-
-            <div class="algo-box" style="margin-top: 1rem;">
-                <h4>State Transition Logic</h4>
+        
+            <h3>1. Main Control Algorithm — Finite State Machine</h3>
+            <p style="color: #aaa; margin-bottom: 1.5rem;">
+                The robot is controlled using a finite state machine (FSM). Each state
+                represents a high-level behavior, and transitions are triggered by
+                sensor readings, timers, or navigation conditions. This design keeps
+                the behavior predictable, modular, and easy to debug.
+            </p>
+        
+            <div class="algo-box">
+                <h4>Global FSM Structure (Pseudo-C)</h4>
                 <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
-void update_state_machine(RobotContext *ctx) {<br>
-&nbsp;&nbsp;switch (current_state) {<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case STARTUP:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;move_forward(START_SPEED)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (time > 2s) → ALIGN_TARGET_POSE<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case ALIGN_TARGET_POSE:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;heading = calculate_heading_to_target()<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (obstacle_detected) → AVOID_OBSTACLE<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;turn_to_heading(heading)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (aligned) → EXPLORE or RETURN_HOME<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case EXPLORE:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;move_forward(EXPLORE_SPEED)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (color_detected) → APPROACH_MINERAL<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (obstacle_ahead) → AVOID_OBSTACLE<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (touch_pressed) → AVOID_OBSTACLE<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (time_to_realign) → ALIGN_TARGET_POSE<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case APPROACH_MINERAL:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;stop_motors()<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ PICKUP_MINERAL<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case PICKUP_MINERAL:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;execute_gripper_sequence()<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ RETURN_HOME<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case RETURN_HOME:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;move_forward(EXPLORE_SPEED)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (distance_to_box < 2.5cm) → DROP_MINERAL<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (obstacle_ahead) → AVOID_OBSTACLE<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if (time_to_realign) → ALIGN_TARGET_POSE<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case DROP_MINERAL:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;release_ore()<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;target_ore_index++<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ EXPLORE<br>
-<br>
-&nbsp;&nbsp;&nbsp;&nbsp;case AVOID_OBSTACLE:<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;move_backward(AVOID_SPEED)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ ALIGN_TARGET_POSE<br>
-&nbsp;&nbsp;}<br>
-}
+        while (match_running) {<br>
+        &nbsp;&nbsp;update_position();<br>
+        &nbsp;&nbsp;update_state_machine();<br>
+        }
                 </p>
             </div>
-
-            <h3 style="margin-top: 3rem;">2. Position Tracking (2D Odometry)</h3>
-            <p style="color: #aaa; margin-bottom: 1.5rem;">The robot maintains real-time awareness of its position and orientation using encoder-based odometry combined with gyroscope feedback for accurate heading.</p>
-
+        
+            <h3 style="margin-top: 3rem;">2. State Descriptions</h3>
+        
             <div class="algo-box">
-                <h4>Coordinate System</h4>
-                <p><strong>Origin (0, 0):</strong> Robot's starting position in home zone<br>
-                <strong>X-axis:</strong> Horizontal position (left/right movement)<br>
-                <strong>Y-axis:</strong> Vertical position (forward/backward movement)<br>
-                <strong>Θ (Theta):</strong> Robot heading from gyro sensor (calibrated at start)<br>
-                <strong>Bearing:</strong> Absolute compass heading for global orientation reference</p>
+                <h4>STARTUP</h4>
+                <p>
+                    The STARTUP state initializes the robot at the beginning of the match.
+                    The robot starts moving forward slowly and sets its first target
+                    mineral position. During testing, if a red mineral is already
+                    detected, the robot immediately transitions to the pickup sequence.
+                </p>
+                <p><strong>Transition:</strong> Immediately switches to EXPLORE after initialization.</p>
             </div>
-
-            <div class="algo-box" style="margin-top: 1rem;">
-                <h4>Position Update Algorithm</h4>
-                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
-// Constants<br>
-WHEEL_DIAMETER = 3 cm<br>
-WHEEL_CIRCUMFERENCE = π × 3 cm<br>
-<br>
-// Main loop (50 Hz update rate)<br>
-while (match_running) {<br>
-&nbsp;&nbsp;// Read encoder changes<br>
-&nbsp;&nbsp;get_encoder_deltas(&d_left, &d_right)<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;// Convert encoder degrees to distance<br>
-&nbsp;&nbsp;dist_left = (d_left / 360) × WHEEL_CIRC<br>
-&nbsp;&nbsp;dist_right = (d_right / 360) × WHEEL_CIRC<br>
-&nbsp;&nbsp;dist = (dist_left + dist_right) / 2<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;// Get current heading from gyro<br>
-&nbsp;&nbsp;gyro_angle = getGyroAngle()<br>
-&nbsp;&nbsp;theta_rad = gyro_angle × (π / 180)<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;// Update position using trigonometry<br>
-&nbsp;&nbsp;pose.x += dist × cos(theta_rad)<br>
-&nbsp;&nbsp;pose.y += dist × sin(theta_rad)<br>
-&nbsp;&nbsp;pose.theta = gyro_angle<br>
-&nbsp;&nbsp;pose.bearing = get_compass_value()<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;update_state_machine()<br>
-&nbsp;&nbsp;sleep(20ms)  // 50 Hz<br>
-}
+        
+            <div class="algo-box">
+                <h4>EXPLORE</h4>
+                <p>
+                    In the EXPLORE state, the robot moves forward toward the current
+                    target mineral position stored in <code>mineral_positions[]</code>.
+                    The color sensor is continuously monitored to detect red minerals.
+                </p>
+                <p>
+                    To correct odometry drift, the robot periodically realigns itself
+                    toward the target using the ALIGN_TARGET_POSE state.
+                </p>
+                <p><strong>Transitions:</strong></p>
+                <ul>
+                    <li>Red mineral detected → APPROACH_MINERAL</li>
+                    <li>Periodic timer → ALIGN_TARGET_POSE</li>
+                </ul>
+            </div>
+        
+            <div class="algo-box">
+                <h4>ALIGN_TARGET_POSE</h4>
+                <p>
+                    This state aligns the robot toward a target position (either a mineral
+                    or the home box). The desired heading is computed using the robot’s
+                    current 2D pose and trigonometric calculations.
+                </p>
+                <p>
+                    Two alignment modes are used:
+                </p>
+                <ul>
+                    <li><strong>Full turn:</strong> For large heading errors</li>
+                    <li><strong>Smooth arc correction:</strong> For small adjustments while moving</li>
+                </ul>
+                <p><strong>Transition:</strong> Returns to EXPLORE or RETURN_HOME depending on context.</p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>APPROACH_MINERAL</h4>
+                <p>
+                    Once a mineral is detected, the robot moves forward for a fixed
+                    duration (2 seconds) to ensure the grabber is properly positioned
+                    in front of the mineral.
+                </p>
+                <p><strong>Transition:</strong> After 2 seconds → PICKUP_MINERAL</p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>PICKUP_MINERAL</h4>
+                <p>
+                    The pickup sequence is executed in a deterministic order:
+                </p>
+                <ul>
+                    <li>Close grabber by a fixed number of degrees</li>
+                    <li>Lift the arm upward by a fixed number of degrees</li>
+                </ul>
+                <p>
+                    Blocking delays are used to guarantee mechanical completion
+                    before transitioning to navigation.
+                </p>
+                <p><strong>Transition:</strong> After pickup → RETURN_HOME</p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>RETURN_HOME</h4>
+                <p>
+                    The robot navigates back to the collection box using its estimated
+                    2D position. The box position is stored as a fixed target, and the
+                    robot periodically realigns its heading toward it.
+                </p>
+                <p>
+                    When the robot is close enough to the box and detects it using the
+                    ultrasonic sensor, it prepares to drop the mineral.
+                </p>
+                <p><strong>Transition:</strong> Near box → DROP_MINERAL</p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>DROP_MINERAL</h4>
+                <p>
+                    The robot releases the mineral by opening the grabber, moves backward
+                    slightly to clear the box, and lowers the lift arm. The target index
+                    is incremented so the next mineral can be collected.
+                </p>
+                <p><strong>Transition:</strong> After drop → EXPLORE</p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>AVOID_OBSTACLE</h4>
+                <p>
+                    Obstacle avoidance is a simple recovery behavior. The robot moves
+                    backward at a fixed speed and then realigns itself toward the target.
+                    This keeps avoidance behavior predictable and avoids complex planning.
+                </p>
+                <p><strong>Transition:</strong> After backing up → ALIGN_TARGET_POSE</p>
+            </div>
+        
+            <h3 style="margin-top: 3rem;">3. Navigation & Position Tracking</h3>
+        
+            <div class="algo-box">
+                <h4>2D Odometry</h4>
+                <p>
+                    The robot maintains an estimate of its position (x, y) and orientation
+                    (θ) using wheel encoder odometry combined with gyroscope feedback.
+                    Encoder deltas are converted to distances and projected onto the
+                    global coordinate system using trigonometry.
                 </p>
             </div>
-
-            <div class="algo-box" style="margin-top: 1rem;">
-                <h4>Encoder Delta Tracking</h4>
-                <p>The system tracks incremental wheel rotations between update cycles:<br><br>
-                <code>get_encoder_deltas()</code> calculates the difference between current and previous encoder positions for each wheel. This differential approach eliminates cumulative encoder overflow issues and provides smooth position updates. Static variables maintain encoder history across function calls.</p>
-            </div>
-
-            <div class="algo-box" style="margin-top: 1rem;">
-                <h4>Navigation to Target Coordinate</h4>
-                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
-int heading_to_target_coord(Pose current, Pose target) {<br>
-&nbsp;&nbsp;// Calculate vector to target<br>
-&nbsp;&nbsp;dx = target.x - current.x<br>
-&nbsp;&nbsp;dy = target.y - current.y<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;// Calculate desired angle using atan2<br>
-&nbsp;&nbsp;desired_rad = atan2(dy, dx)<br>
-&nbsp;&nbsp;desired_deg = desired_rad × (180 / π)<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;// Compute heading error<br>
-&nbsp;&nbsp;diff = desired_deg - current.theta<br>
-&nbsp;&nbsp;<br>
-&nbsp;&nbsp;// Normalize to [-180, 180]<br>
-&nbsp;&nbsp;return normalize_angle(diff)<br>
-}
+        
+            <div class="algo-box">
+                <h4>Heading Computation</h4>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
+        heading = atan2(target.y - pose.y, target.x - pose.x) - pose.theta
+                </p>
+                <p>
+                    The heading error is normalized and used to decide whether to perform
+                    a full turn or a smooth arc correction.
                 </p>
             </div>
-
-            <div class="algo-box" style="margin-top: 1rem;">
-                <h4>Distance Calculation</h4>
-                <p>Euclidean distance to any target position:<br>
-                <code>distance = √[(target.x - current.x)² + (target.y - current.y)²]</code><br><br>
-                Used to determine when robot has reached destination (threshold: 2.5 cm for box position) and for real-time distance monitoring displayed every 50 update cycles.</p>
-            </div>
-
-            <div class="algo-box" style="margin-top: 1rem;">
-                <h4>Dual Heading System</h4>
-                <p><strong>Gyroscope (Theta):</strong> Relative heading for precise turns and odometry calculations. Calibrated to zero at startup.<br>
-                <strong>Compass (Bearing):</strong> Absolute global heading (0-359°) for long-term orientation reference. Box bearing calculated as initial_heading + 180° to always know home direction.<br><br>
-                This redundancy provides both precision (gyro) and global reference (compass) for robust navigation.</p>
-            </div>
-
-            <h3 style="margin-top: 3rem;">3. Motor Control & Turning Strategies</h3>
-
+        
             <div class="algo-box">
-                <h4>Gyro-Feedback Turning</h4>
-                <p><strong>Non-blocking turns:</strong> Instead of waiting for motor completion, the system uses gyroscope feedback to monitor turn progress in real-time:<br><br>
-                <code>start_turn(ctx, degrees, direction, speed)</code> - Initiates turn and stores state<br>
-                <code>update_turn(ctx)</code> - Called every cycle to check if target angle reached<br><br>
-                When <code>|current_gyro - start_gyro| ≥ target_degrees</code>, motors stop and turn_active flag clears. This allows the state machine to continue processing during turns.</p>
-            </div>
-
-            <div class="algo-box">
-                <h4>Arc Movement (Smooth Correction)</h4>
-                <p>For gentle course corrections without stopping:<br><br>
-                <strong>Principle:</strong> Reduce speed on inner wheel to create curved path<br>
-                <strong>Implementation:</strong> If turning left, left_speed -= 40%, maintaining forward motion<br>
-                <strong>Usage:</strong> Called every 3 seconds during EXPLORE and RETURN_HOME for drift correction<br>
-                <strong>Benefit:</strong> Maintains momentum while adjusting heading, more efficient than stop-turn-go</p>
-            </div>
-
-            <div class="algo-box">
-                <h4>Encoder Delta System</h4>
-                <p>Tracks wheel rotation changes between update cycles using static variables to maintain state:<br><br>
-                <code>get_encoder_deltas(&d_left, &d_right)</code> returns incremental rotation since last call. First call initializes baseline, subsequent calls return difference. This differential approach prevents integer overflow and provides smooth odometry updates at 50 Hz.</p>
-            </div>
-
-            <div class="algo-box">
-                <h4>Resource Prioritization</h4>
-                <p>Minerals are collected in a predefined sequence stored in <code>mineral_positions[]</code> array. The robot uses a <code>target_ore_index</code> counter that increments after each successful collection. This ensures systematic coverage of the arena and prevents revisiting already collected ores.</p>
-            </div>
-
-            <div class="algo-box">
-                <h4>Obstacle Avoidance</h4>
-                <p><strong>Ultrasonic Sensor:</strong> When distance < 15cm, immediately stop and transition to AVOID_OBSTACLE state<br>
-                <strong>Touch Sensor:</strong> Physical contact triggers immediate avoidance routine<br>
-                <strong>Avoidance Behavior:</strong> Move backward at AVOID_SPEED (15% power), then return to ALIGN_TARGET_POSE to recalculate optimal heading<br>
-                <strong>Recovery:</strong> After avoiding, robot realigns toward target and resumes mission</p>
-            </div>
-
-            <div class="algo-box">
-                <h4>Periodic Realignment</h4>
-                <p>To compensate for accumulated odometry errors, the robot periodically realigns itself:<br>
-                <strong>Full Realignment:</strong> Every 10 seconds (ALIGN_TARGET_INTERVAL) - Complete stop and recalculate heading<br>
-                <strong>Smooth Adjustment:</strong> Every 3 seconds (ALIGN_TARGET_ADJUST_INTERVAL) - Arc movement correction without stopping<br>
-                This dual-strategy ensures both precision and efficiency during navigation.</p>
-            </div>
-
-            <div class="placeholder" style="margin-top: 2rem;">
-                <p>Detailed flowcharts and visual diagrams will be added here</p>
+                <h4>Why This Strategy Is Efficient</h4>
+                <ul>
+                    <li>FSM structure avoids ambiguous behaviors</li>
+                    <li>Time-based actions ensure mechanical reliability</li>
+                    <li>Periodic realignment compensates for odometry drift</li>
+                    <li>Smooth arc corrections maintain momentum</li>
+                    <li>Simple obstacle recovery prevents deadlocks</li>
+                </ul>
             </div>
         </section>
+        
 
-        <section id="progress">
-            <h2>Project Progress</h2>
-            
-            <h3 style="margin-top: 1rem;">Development Milestones</h3>
-            <div class="status-grid">
-                <div class="status-item">
-                    <h3>Setup Complete</h3>
-                    <p>Dev environment configured</p>
-                </div>
-                <div class="status-item">
-                    <h3>In Progress</h3>
-                    <p>Robot assembly</p>
-                </div>
-                <div class="status-item">
-                    <h3>Testing</h3>
-                    <p>Sensor calibration</p>
-                </div>
-                <div class="status-item">
-                    <h3>January 6</h3>
-                    <p>First competition</p>
-                </div>
-            </div>
-
-            <div class="placeholder">
-                <p>Videos and photos of robot testing will be added here</p>
-                <p style="font-size: 0.85rem; margin-top: 0.5rem; color: #555;">Test runs · Competition footage · Development process</p>
-            </div>
-        </section>
+        
 
         <section id="links">
             <h2>Resources</h2>
@@ -734,15 +666,7 @@ int heading_to_target_coord(Pose current, Pose target) {<br>
             </div>
         </section>
 
-        <section>
-            <h2>Development Log</h2>
-            <p style="color: #aaa; line-height: 1.8; margin-bottom: 1.5rem;">
-                This section will be updated regularly with our progress, challenges faced, and solutions implemented throughout the project lifecycle.
-            </p>
-            <div class="placeholder">
-                <p>Development updates coming soon</p>
-            </div>
-        </section>
+       
     </div>
 
     <footer>
