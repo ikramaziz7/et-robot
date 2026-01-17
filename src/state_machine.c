@@ -6,10 +6,10 @@
 #include "time_utils.h"
 
 #define START_SPEED 5
-#define EXPLORE_SPEED      5  // percent of max speed
+#define EXPLORE_SPEED      15  // percent of max speed
 #define AVOID_SPEED      15  // percent of max speed
 #define SONAR_THRESHOLD    15  // cm for obstacle
-#define MINERAL_DIST_TARGET_THRESHOLD 5
+#define MINERAL_DIST_TARGET_THRESHOLD 4
 #define ALIGN_TARGET_INTERVAL 10000
 #define ALIGN_TARGET_ADJUST_INTERVAL 3000
 #define ALIGN_DEGREES_TOLERANCE 2
@@ -52,19 +52,23 @@ void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
             return;
         }
         
-        if (!smooth_align_turn) {
-            start_turn(ctx, angle, direction, EXPLORE_SPEED);
-        }
-        else {
-            start_move_with_arc(ctx, direction, EXPLORE_SPEED, angle);
-        }
+        start_turn(ctx, angle, direction, EXPLORE_SPEED);
+
+        // if (!smooth_align_turn) {
+        //     start_turn(ctx, angle, direction, EXPLORE_SPEED);
+        // }
+        // else {
+        //     start_move_with_arc(ctx, direction, EXPLORE_SPEED, angle);
+        // }
     } else {
-        if (!smooth_align_turn) {
-            update_turn(ctx);
-        }
-        else {
-            update_move_with_arc(ctx);
-        }
+        update_turn(ctx);
+
+        // if (!smooth_align_turn) {
+        //     update_turn(ctx);
+        // }
+        // else {
+        //     update_move_with_arc(ctx);
+        // }
     }
 }
 
@@ -229,23 +233,28 @@ static void state_drop_mineral(RobotContext *ctx) {
         ctx->state_just_entered = 0;
         smooth_align_turn = 0;
         ctx->target_ore_index++;
-        
+    }
 
+    if (millis() - ctx->state_entry_time_ms >= 1000) {
+        stop_motors();
         // Open grabber to release mineral
         control_grabber_degrees(GRABBER_CLOSEDIR * -1, GRABBER_DEGREES);
         Sleep(1000);  // Wait for mineral to drop
-        
-        // Move back slightly
         move(-1, EXPLORE_SPEED);
-        Sleep(1000);
-        stop_motors();
 
-        // Lower lift arm back down
-        control_lift_arm_degrees(LIFT_LIFTDIR * -1, LIFT_DEGREES);
-        Sleep(1000);
+        // Move back slightly
+        if (millis() - ctx->state_entry_time_ms >= 1000) {
+            stop_motors();
+
+            // Lower lift arm back down
+            control_lift_arm_degrees(LIFT_LIFTDIR * -1, LIFT_DEGREES);
+            Sleep(1000);
+            
+            // Continue exploring
+            change_state(ctx, STATE_EXPLORE);
+        }
         
-        // Continue exploring
-        change_state(ctx, STATE_EXPLORE);
+        
     }
 }
 
