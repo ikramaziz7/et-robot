@@ -211,6 +211,7 @@ static void speak(const char *phrase) {
 static void state_return_home(RobotContext *ctx) {
     if (ctx->state_just_entered) {
         printf("[STATE] RETURN HOME\n");
+        speak("E.T. phone home");
         curr_moving_state = STATE_RETURN_HOME;
         move(1, EXPLORE_SPEED);
         smooth_align_turn = 0;
