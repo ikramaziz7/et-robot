@@ -24,4 +24,6 @@ void print_pose(const Pose *p);
 void print_distance_to_target(Pose current, Pose target);
 int normalize_angle(int a);
 
+void apply_starting_position(const char *starting_position);
+
 #endif // POSITION_H
