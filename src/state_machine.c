@@ -6,10 +6,10 @@
 #include "time_utils.h"
 
 #define START_SPEED 5
-#define EXPLORE_SPEED      15  // percent of max speed
+#define EXPLORE_SPEED      15     // percent of max speed
 #define AVOID_SPEED      15  // percent of max speed
-#define SONAR_THRESHOLD    15  // cm for obstacle
-#define MINERAL_DIST_TARGET_THRESHOLD 4
+#define SONAR_THRESHOLD    6  // cm for obstacle
+#define MINERAL_DIST_TARGET_THRESHOLD 15
 #define ALIGN_TARGET_INTERVAL 10000
 #define ALIGN_TARGET_ADJUST_INTERVAL 3000
 #define ALIGN_DEGREES_TOLERANCE 2
@@ -28,6 +28,7 @@ RobotState curr_moving_state;
 
 static int zigzag_direction = 1;
 int smooth_align_turn = 0;
+int reached_offset = 0;
 
 static void state_startup(RobotContext *ctx) {
     /* Entry actions */
@@ -82,20 +83,28 @@ static void state_align_target_pose(RobotContext *ctx) {
 
     float distance_to_dst = distance_to_target(ctx->pose, ctx->dst);
     int distance = getDistanceCM();
-    if (distance_to_dst < MINERAL_DIST_TARGET_THRESHOLD &&
-        distance > 0 && distance < SONAR_THRESHOLD) {
+    if (distance > 0 && distance < SONAR_THRESHOLD) {
         stop_motors();
-        ctx->previous_state = ctx->current_state;
-        if (curr_moving_state == STATE_RETURN_HOME) {
-            change_state(ctx, STATE_DROP_MINERAL);
-        } 
-        else {
-            change_state(ctx, STATE_APPROACH_MINERAL);
+        if (distance_to_dst < MINERAL_DIST_TARGET_THRESHOLD) {
+            ctx->previous_state = ctx->current_state;
+            if (curr_moving_state == STATE_RETURN_HOME) {
+                change_state(ctx, STATE_DROP_MINERAL);
+            } 
+            else {
+                change_state(ctx, STATE_APPROACH_MINERAL);
+            }
+            return;
         }
-        return;
+        else {
+            change_state(ctx, STATE_AVOID_OBSTACLE);
+            return;
+        }
     }
 
-    move_to_target_position(ctx, ctx->pose, ctx->dst);
+    if (distance_to_target > 15) {
+        move_to_target_position(ctx, ctx->pose, ctx->dst);
+    }
+    
     
     if (!ctx->turn_active) {
         if (curr_moving_state == STATE_RETURN_HOME) {
@@ -120,21 +129,28 @@ static void state_explore(RobotContext *ctx) {
     }
 
     // Check for minerals
-    // int color = getColor();
-    // if (color == COLOR_RED) {
-    //     ctx->target_mineral_color = color;
-    //     stop_motors();
-    //     change_state(ctx, STATE_APPROACH_MINERAL);
-    //     return;
-    // }
+    int color = getColor();
+    if (color == COLOR_RED) {
+        ctx->target_mineral_color = color;
+        stop_motors();
+        change_state(ctx, STATE_APPROACH_MINERAL);
+        return;
+    }
 
     // Check for obstacles
+    float distance_to_dst = distance_to_target(ctx->pose, ctx->dst);
     int distance = getDistanceCM();
-    if (distance > 0 && distance < MINERAL_DIST_TARGET_THRESHOLD) {
-       stop_motors();
-       ctx->previous_state = ctx->current_state;
-       change_state(ctx, STATE_APPROACH_MINERAL);
-       return;
+    if (distance > 0 && distance < SONAR_THRESHOLD) {
+        if (distance_to_dst < MINERAL_DIST_TARGET_THRESHOLD) {
+            stop_motors();
+            ctx->previous_state = ctx->current_state;
+            change_state(ctx, STATE_APPROACH_MINERAL);
+            return;
+        }
+        else {
+            change_state(ctx, STATE_AVOID_OBSTACLE);
+            return; 
+        }
     }
 
     if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
@@ -157,7 +173,7 @@ static void state_approach_mineral(RobotContext *ctx) {
         ctx->state_just_entered = 0;
     }
 
-    if (millis() - ctx->state_entry_time_ms >= 2000) {
+    if (millis() - ctx->state_entry_time_ms >= 200) {
         stop_motors();
         change_state(ctx, STATE_PICKUP_MINERAL);
     }
@@ -201,7 +217,7 @@ static void state_return_home(RobotContext *ctx) {
         ctx->state_just_entered = 0;
         
         // Step 1: Start by going to the offset position
-        ctx->dst = box_offset; 
+        ctx->dst = box_position; 
         printf("Heading to OFFSET: %f %f\n", ctx->dst.x, ctx->dst.y);
     }
 
@@ -212,24 +228,30 @@ static void state_return_home(RobotContext *ctx) {
     // Calculate distance to the CURRENT destination (which starts as box_offset)
     float distance_to_current_dst = distance_to_target(ctx->pose, ctx->dst);
     int distance_sensor = getDistanceCM();
+    if (distance_to_current_dst < MINERAL_DIST_TARGET_THRESHOLD && 
+        distance_sensor > 0 && distance_sensor < SONAR_THRESHOLD) {
+        change_state(ctx, STATE_DROP_MINERAL);
+        return; // Exit early to avoid state alignment logic below
+    }
 
     // Logic to switch from OFFSET to FINAL position
-    if (ctx->dst.x == box_offset.x && ctx->dst.y == box_offset.y) {
-        // If we are within a small threshold of the offset, switch to the actual box
-        if (distance_to_current_dst < 5.0) { 
-            printf("[STATE] RETURN HOME: Offset reached. Moving to final box position.\n");
-            ctx->dst = box_position;
-        }
-    } 
-    else {
-        // Step 2: We are now heading to box_position. 
-        // Check if we arrived at the final box to drop the mineral.
-        if (distance_to_current_dst < 15 && 
-            distance_sensor > 0 && distance_sensor < SONAR_THRESHOLD) {
-            change_state(ctx, STATE_DROP_MINERAL);
-            return; // Exit early to avoid state alignment logic below
-        }
-    }
+    // if (ctx->dst.x == box_offset.x && ctx->dst.y == box_offset.y) {
+    //     // If we are within a small threshold of the offset, switch to the actual box
+    //     if (distance_to_current_dst < 10) { 
+    //         printf("[STATE] RETURN HOME: Offset reached. Moving to final box position.\n");
+    //         ctx->dst = box_position;
+    //         reached_offset = 1;
+    //     }
+    // } 
+    // else {
+    //     // Step 2: We are now heading to box_position. 
+    //     // Check if we arrived at the final box to drop the mineral.
+    //     if (distance_to_current_dst < MINERAL_DIST_TARGET_THRESHOLD && 
+    //         distance_sensor > 0 && distance_sensor < SONAR_THRESHOLD) {
+    //         change_state(ctx, STATE_DROP_MINERAL);
+    //         return; // Exit early to avoid state alignment logic below
+    //     }
+    // }
 
     // Alignment and Movement Logic
     if (!ctx->aligned_home_initial || 
@@ -254,13 +276,16 @@ static void state_drop_mineral(RobotContext *ctx) {
         ctx->target_ore_index++;
     }
 
-    if (millis() - ctx->state_entry_time_ms >= 2000) {
+    if (millis() - ctx->state_entry_time_ms >= 500) {
         stop_motors();
         // Open grabber to release mineral
         control_grabber_degrees(GRABBER_CLOSEDIR * -1, GRABBER_DEGREES);
         Sleep(1000);  // Wait for mineral to drop
-        move(-1, EXPLORE_SPEED);
-
+        
+        for (int i = 0; i < 150; i++) {
+            move(-1, EXPLORE_SPEED);
+        }
+        
         // Move back slightly
         if (millis() - ctx->state_entry_time_ms >= 1000) {
             stop_motors();
@@ -285,16 +310,10 @@ static void state_avoid_obstacle(RobotContext *ctx) {
         ctx->state_just_entered = 0;
     }
 
-    float dist_to_target = distance_to_target(ctx->pose, box_position);
-    if (dist_to_target < MINERAL_DIST_TARGET_THRESHOLD) {
-        change_state(ctx, STATE_APPROACH_MINERAL);
+    for (int i = 0; i < 100; i++) {
+        move(-1, AVOID_SPEED);
     }
-    else {
-        for (int i = 0; i < 100; i++) {
-            move(-1, AVOID_SPEED);
-        }
-        change_state(ctx, STATE_ALIGN_TARGET_POSE);
-    }
+    change_state(ctx, STATE_ALIGN_TARGET_POSE);
 }
 
 static void state_end_match(RobotContext *ctx) {

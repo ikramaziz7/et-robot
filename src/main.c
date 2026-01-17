@@ -42,6 +42,32 @@ int main(int argc, const char *argv[])
     resetGyro();
     Sleep(5000);
 
+    
+
+    // bool timeInitialized = false;
+    // uint32_t initial_time = 0;
+    // bool loopEntered = false;
+    // while(true) {
+    //     int distance = getDistanceCM();
+    //     printf("Distance: %d\n", distance);
+    //     if (distance <= 6 || loopEntered) {
+    //         loopEntered = true;
+    //         if (!timeInitialized) {
+    //          initial_time = millis();
+    //          timeInitialized = true;
+    //         }
+    //         move(1, 10);
+    //         if (millis() - initial_time > 500) {
+    //             control_grabber_degrees(GRABBER_CLOSEDIR, GRABBER_DEGREES);
+    //             Sleep(1000);  // Wait for grabber to close
+                
+    //             // Then lift up
+    //             control_lift_arm_degrees(LIFT_LIFTDIR, LIFT_DEGREES);
+    //             Sleep(1000);  // Wait for lift to complete
+    //         } 
+    //     }
+    // }
+
     //turn_degrees_speed(1000, 1, 70);
     if (strcmp(argv[1], "simple1") == 0) {
         printf("Mode selected: Simple 1 mineral\n");
