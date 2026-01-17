@@ -11,6 +11,7 @@ typedef struct Pose {
 } Pose;
 
 extern Pose mineral_positions[];
+extern Pose box_offset;
 extern Pose box_position;
 
 float degrees_to_cm(int deg);

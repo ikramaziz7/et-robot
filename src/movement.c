@@ -66,6 +66,17 @@ void stop_motors(void) {
     set_tacho_command_inx(sn_right, TACHO_STOP);
 }
 
+void stop_grabber_and_lift(void) {
+    if (sn_grabber == 0xFF || sn_lift == 0xFF) {
+        if (!init_motors()) return;
+    }
+
+    set_tacho_stop_action_inx(sn_grabber, TACHO_COAST);
+    set_tacho_stop_action_inx(sn_lift, TACHO_COAST);
+    set_tacho_command_inx(sn_grabber, TACHO_STOP);
+    set_tacho_command_inx(sn_lift, TACHO_STOP);
+}
+
 // Turn on spot: -1=left, 1=right
 void turn(int direction, int speed_ratio) {
     if (sn_left == 0xFF || sn_right == 0xFF) {

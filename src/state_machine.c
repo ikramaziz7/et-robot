@@ -195,24 +195,43 @@ static void speak(const char *phrase) {
 static void state_return_home(RobotContext *ctx) {
     if (ctx->state_just_entered) {
         printf("[STATE] RETURN HOME\n");
-        //speak("ET phone home");
         curr_moving_state = STATE_RETURN_HOME;
         move(1, EXPLORE_SPEED);
         smooth_align_turn = 0;
         ctx->state_just_entered = 0;
-        ctx->dst=box_position;
+        
+        // Step 1: Start by going to the offset position
+        ctx->dst = box_offset; 
+        printf("Heading to OFFSET: %f %f\n", ctx->dst.x, ctx->dst.y);
     }
+
     if (millis() - ctx->state_entry_time_ms > 20000) {
         stop_motors();
     }
 
-    float distance_to_box = distance_to_target(ctx->pose, box_position);
-    int distance = getDistanceCM();
-    if (distance_to_box < 15 && 
-        distance > 0 && distance < SONAR_THRESHOLD) {
-        change_state(ctx, STATE_DROP_MINERAL);
+    // Calculate distance to the CURRENT destination (which starts as box_offset)
+    float distance_to_current_dst = distance_to_target(ctx->pose, ctx->dst);
+    int distance_sensor = getDistanceCM();
+
+    // Logic to switch from OFFSET to FINAL position
+    if (ctx->dst.x == box_offset.x && ctx->dst.y == box_offset.y) {
+        // If we are within a small threshold of the offset, switch to the actual box
+        if (distance_to_current_dst < 5.0) { 
+            printf("[STATE] RETURN HOME: Offset reached. Moving to final box position.\n");
+            ctx->dst = box_position;
+        }
+    } 
+    else {
+        // Step 2: We are now heading to box_position. 
+        // Check if we arrived at the final box to drop the mineral.
+        if (distance_to_current_dst < 15 && 
+            distance_sensor > 0 && distance_sensor < SONAR_THRESHOLD) {
+            change_state(ctx, STATE_DROP_MINERAL);
+            return; // Exit early to avoid state alignment logic below
+        }
     }
 
+    // Alignment and Movement Logic
     if (!ctx->aligned_home_initial || 
         (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL)) {
         ctx->aligned_home_initial = 1;
@@ -235,7 +254,7 @@ static void state_drop_mineral(RobotContext *ctx) {
         ctx->target_ore_index++;
     }
 
-    if (millis() - ctx->state_entry_time_ms >= 1000) {
+    if (millis() - ctx->state_entry_time_ms >= 2000) {
         stop_motors();
         // Open grabber to release mineral
         control_grabber_degrees(GRABBER_CLOSEDIR * -1, GRABBER_DEGREES);
@@ -245,11 +264,13 @@ static void state_drop_mineral(RobotContext *ctx) {
         // Move back slightly
         if (millis() - ctx->state_entry_time_ms >= 1000) {
             stop_motors();
-
+            
             // Lower lift arm back down
             control_lift_arm_degrees(LIFT_LIFTDIR * -1, LIFT_DEGREES);
             Sleep(1000);
             
+            stop_grabber_and_lift();
+
             // Continue exploring
             change_state(ctx, STATE_EXPLORE);
         }
