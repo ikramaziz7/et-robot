@@ -13,7 +13,7 @@ Pose mineral_positions[] = {
     {120.0f, 12.0f, 30, 320},   
 };
 
-Pose box_offset = {60.0f, -30.0f, 0, -1};
+Pose box_offset = {30.0f, -30.0f, 0, -1};
 Pose box_position = {0.0f, -30.0f, 0, -1};
 
 // Convert encoder degrees to cm
