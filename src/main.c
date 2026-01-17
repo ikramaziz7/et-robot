@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
 #include "movement.h"
 #include "sensors.h"
 #include "ev3.h"
@@ -13,6 +15,14 @@
 
 int main(int argc, const char *argv[])
 {
+
+    // when standing on the side of the field with the starting positions facing the field
+    // "right" is negative, "left" is positive
+    const char *starting_position = argv[2];
+    printf("Starting Position: %s\n", starting_position);
+
+    apply_starting_position(starting_position);
+
     //speak("ET phone home");
     // Initialize EV3
     if (ev3_init() == -1) {

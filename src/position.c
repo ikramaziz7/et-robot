@@ -1,6 +1,7 @@
 #include "position.h"
 #include "sensors.h"
 #include <math.h>
+#include <string.h>
 #include "state_machine.h"
 
 #define M_PI 3.14159265358979323846
@@ -14,6 +15,13 @@ Pose mineral_positions[] = {
 };
 
 Pose box_position = {0.0f, 40.0f, 0, -1};
+
+void apply_starting_position(const char *starting_position) {
+    if (starting_position && strcmp(starting_position, "right") == 0) {
+        mineral_positions[1].y = -35.0f;
+        box_position.y = -40.0f;
+    }
+}
 
 // Convert encoder degrees to cm
 float degrees_to_cm(int deg) {
