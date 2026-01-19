@@ -17,11 +17,11 @@ int main(int argc, const char *argv[])
 {
 
     // when standing on the side of the field with the starting positions facing the field
-    // "right" is negative, "left" is positive
     const char *starting_position = (argc > 2) ? argv[2] : NULL;
     if (starting_position) {
         printf("Starting Position: %s\n", starting_position);
         apply_starting_position(starting_position);
+        printf("Box position set to: x=%.2f, y=%.2f\n", box_position.x, box_position.y);
     } else {
         printf("No starting position provided (using defaults)\n");
     }

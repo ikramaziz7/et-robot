@@ -18,14 +18,10 @@ Pose box_position = {0.0f, 40.0f, 0, -1};
 
 void apply_starting_position(const char *starting_position) {
     if (starting_position && strcmp(starting_position, "left") == 0) {
-        // Right side: robot 1 at bottom
         mineral_positions[1].y = -35.0f;
-        box_position.y = -35.0f; 
-    } else if (starting_position && strcmp(starting_position, "right") == 0) {
-        mineral_positions[1].y = 35.0f;
-        box_position.y = 35.0f; 
+        box_position.y = -40.0f;
     } else {
-        // Default: keep original values
+        // Right/default: keep original values
         mineral_positions[1].y = 35.0f;
         box_position.y = 40.0f;
     }
