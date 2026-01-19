@@ -7,6 +7,8 @@ pages:
   script:
     - mkdir public
     - cp index.html public/
+    - cp *.png public/
+    - cp *.jpg public/
   artifacts:
     paths:
       - public
