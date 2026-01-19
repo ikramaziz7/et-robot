@@ -36,7 +36,6 @@ int main(int argc, const char *argv[])
     printf("EV3 initialized\n");
     printf("Waiting for motors to be detected...\n");
     
-    // Wait for motors to be detected
     while (ev3_tacho_init() < 1) Sleep(1000);    
     
     init_motors();
@@ -136,7 +135,6 @@ int main(int argc, const char *argv[])
         ev3_uninit();
 
         printf("Match ended, robot stopped\n");
-        //Sleep(10000);  // Wait for grabber to close
     } 
     else {
         printf("Unknown argument: %s\n", argv[1]);

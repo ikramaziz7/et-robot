@@ -54,7 +54,8 @@ void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
         }
         
         start_turn(ctx, angle, direction, EXPLORE_SPEED);
-
+        
+        // ATM commented out, because robot doesen't always drive straight
         // if (!smooth_align_turn) {
         //     start_turn(ctx, angle, direction, EXPLORE_SPEED);
         // }
@@ -64,6 +65,7 @@ void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
     } else {
         update_turn(ctx);
 
+         // ATM commented out, because robot doesen't always drive straight
         // if (!smooth_align_turn) {
         //     update_turn(ctx);
         // }
@@ -234,25 +236,6 @@ static void state_return_home(RobotContext *ctx) {
         change_state(ctx, STATE_DROP_MINERAL);
         return; // Exit early to avoid state alignment logic below
     }
-
-    // Logic to switch from OFFSET to FINAL position
-    // if (ctx->dst.x == box_offset.x && ctx->dst.y == box_offset.y) {
-    //     // If we are within a small threshold of the offset, switch to the actual box
-    //     if (distance_to_current_dst < 10) { 
-    //         printf("[STATE] RETURN HOME: Offset reached. Moving to final box position.\n");
-    //         ctx->dst = box_position;
-    //         reached_offset = 1;
-    //     }
-    // } 
-    // else {
-    //     // Step 2: We are now heading to box_position. 
-    //     // Check if we arrived at the final box to drop the mineral.
-    //     if (distance_to_current_dst < MINERAL_DIST_TARGET_THRESHOLD && 
-    //         distance_sensor > 0 && distance_sensor < SONAR_THRESHOLD) {
-    //         change_state(ctx, STATE_DROP_MINERAL);
-    //         return; // Exit early to avoid state alignment logic below
-    //     }
-    // }
 
     // Alignment and Movement Logic
     if (!ctx->aligned_home_initial || 
