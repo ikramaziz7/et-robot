@@ -58,6 +58,9 @@
         }
 
         .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
             font-size: 1.5rem;
             font-weight: 600;
             color: #fff;
@@ -65,9 +68,21 @@
             transition: all 0.3s ease;
         }
 
+        .logo img {
+            height: 45px;
+            width: 45px;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));
+            transition: transform 0.3s ease;
+        }
+
         .logo:hover {
             transform: translateX(5px);
             color: #a8b3ff;
+        }
+
+        .logo:hover img {
+            transform: scale(1.05);
         }
 
         nav {
@@ -424,7 +439,10 @@
 
     <header>
         <div class="header-content">
-            <div class="logo">ORE REAPER</div>
+            <div class="logo">
+                <img src="ET_2.png" alt="E.T. Robot logo">
+                <span>E.T. Robot</span>
+            </div>
             <nav>
                 <a href="#team">Team</a>
                 <a href="#robot">Robot</a>
@@ -436,7 +454,7 @@
     </header>
 
     <div class="hero">
-        <h1>ORE REAPER</h1>
+        <h1>Extraction & Transport Robot</h1>
         <p>Autonomous Resource Mining Champion</p>
         <div class="team-badge">Team 2 · Fall 2025</div>
     </div>
@@ -462,7 +480,7 @@
 
         <section id="robot">
             <h2>Robot Architecture</h2>
-            <p style="color: #aaa; margin-bottom: 2rem;">The Ore Reaper is designed for maximum efficiency in resource collection with advanced sensor integration and autonomous navigation capabilities.</p>
+            <p style="color: #aaa; margin-bottom: 2rem;">The E.T. robot is designed for maximum efficiency in resource collection with advanced sensor integration and autonomous navigation capabilities.</p>
             
             <h3 style="margin-top: 2rem;">Technical Specifications</h3>
             <div class="status-grid">
@@ -670,7 +688,7 @@
     </div>
 
     <footer>
-        <p>© 2025 Ore Reaper · Team 2</p>
+        <p>© 2025 E.T. - Extraction & Transport · Team 2</p>
         <p style="margin-top: 0.3rem;">Telecom Paris · Operating Systems Course</p>
     </footer>
 </body>
