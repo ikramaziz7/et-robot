@@ -18,10 +18,13 @@ int main(int argc, const char *argv[])
 
     // when standing on the side of the field with the starting positions facing the field
     // "right" is negative, "left" is positive
-    const char *starting_position = argv[2];
-    printf("Starting Position: %s\n", starting_position);
-
-    apply_starting_position(starting_position);
+    const char *starting_position = (argc > 2) ? argv[2] : NULL;
+    if (starting_position) {
+        printf("Starting Position: %s\n", starting_position);
+        apply_starting_position(starting_position);
+    } else {
+        printf("No starting position provided (using defaults)\n");
+    }
 
     //speak("ET phone home");
     // Initialize EV3

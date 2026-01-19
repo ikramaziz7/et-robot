@@ -6,7 +6,7 @@
 #include "time_utils.h"
 
 #define START_SPEED 5
-#define EXPLORE_SPEED      15     // percent of max speed
+#define EXPLORE_SPEED      20     // percent of max speed
 #define AVOID_SPEED      15  // percent of max speed
 #define SONAR_THRESHOLD    6  // cm for obstacle
 #define MINERAL_DIST_TARGET_THRESHOLD 15
