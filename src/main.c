@@ -15,7 +15,6 @@
 
 int main(int argc, const char *argv[])
 {
-
     // when standing on the side of the field with the starting positions facing the field
     const char *starting_position = (argc > 2) ? argv[2] : NULL;
     if (starting_position) {
@@ -26,7 +25,6 @@ int main(int argc, const char *argv[])
         printf("No starting position provided (using defaults)\n");
     }
 
-    //speak("ET phone home");
     // Initialize EV3
     if (ev3_init() == -1) {
         printf("Failed to initialize EV3\n");
@@ -43,7 +41,10 @@ int main(int argc, const char *argv[])
     resetGyro();
     Sleep(5000);
 
-    // Sometimes used for troubleshooting and testing
+    // Two 'modes' below - first for a very simple grap and drop, highly hard-coded. Second, a state machine, 
+    // requires all sensors to be functional throughout the game
+
+    // Sometimes used for troubleshooting and testing, ATM does not work with current build
     if (strcmp(argv[1], "simple1") == 0) {
         printf("Mode selected: Simple 1 mineral\n");
         bool isMineralPickedUp = false;
@@ -102,8 +103,7 @@ int main(int argc, const char *argv[])
 
         printf("Starting FSM\n");
 
-        int g1 = getGyroAngle();
-        // Control loop
+        // FSM loop
         int ticCounter = 0;
         while (ctx.match_running) {
             // get encoder values
@@ -116,7 +116,7 @@ int main(int argc, const char *argv[])
             // Use encoder values plus angle to update position
             update_pose(&ctx, d_left, d_right, gyro);
             
-            // Only print out sometimes
+            // Only print out sometimes to not spam log output
             if (++ticCounter % 50 == 0) {
                 if (ctx.current_state == STATE_EXPLORE) {
                     print_distance_to_target(ctx.pose, mineral_positions[ctx.target_ore_index]);
@@ -126,10 +126,11 @@ int main(int argc, const char *argv[])
                 }
                 print_pose(&ctx.pose);
             }
-
+            
+            // Where the interesting stuff happens :)
             update_state_machine(&ctx);
 
-            Sleep(20);   // 50 Hz update rate
+            Sleep(20);   // 50 Hz update rate, to avoid jittery states and 'account' for noisy input from sensor.
         }
 
         ev3_uninit();
