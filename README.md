@@ -1,7 +1,5 @@
 # Robot Project for OS 2025
 
-EV3 Resource Mining Robot. Implemented as FSM, with gyro, color, sonar sensors, and derived calculations for state transitions. Grabber + lift and of course motors for movement.  
-
 ## Build (Cross-Compiling with Docker)
 
 ### 1. Pull the Docker Image

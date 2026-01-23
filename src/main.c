@@ -15,6 +15,7 @@
 
 int main(int argc, const char *argv[])
 {
+
     // when standing on the side of the field with the starting positions facing the field
     const char *starting_position = (argc > 2) ? argv[2] : NULL;
     if (starting_position) {
@@ -25,6 +26,7 @@ int main(int argc, const char *argv[])
         printf("No starting position provided (using defaults)\n");
     }
 
+    //speak("ET phone home");
     // Initialize EV3
     if (ev3_init() == -1) {
         printf("Failed to initialize EV3\n");
@@ -34,17 +36,52 @@ int main(int argc, const char *argv[])
     printf("EV3 initialized\n");
     printf("Waiting for motors to be detected...\n");
     
-    while (ev3_tacho_init() < 1) Sleep(1000);    
+    // Wait for motors to be detected
+    while (ev3_tacho_init() < 1) Sleep(1000);
+    
+    printf("Motors detected!\n");
+    
+    //control_grabber_degrees(-1, 100);
+    //Sleep(1000);
+    //control_lift_arm_degrees(1, 500);
+   
+    
+      // Wait for grabber to close
+    
+    // Then lift up
     
     init_motors();
     initSensors();
     resetGyro();
     Sleep(5000);
 
-    // Two 'modes' below - first for a very simple grap and drop, highly hard-coded. Second, a state machine, 
-    // requires all sensors to be functional throughout the game
+    
 
-    // Sometimes used for troubleshooting and testing, ATM does not work with current build
+    // bool timeInitialized = false;
+    // uint32_t initial_time = 0;
+    // bool loopEntered = false;
+    // while(true) {
+    //     int distance = getDistanceCM();
+    //     printf("Distance: %d\n", distance);
+    //     if (distance <= 6 || loopEntered) {
+    //         loopEntered = true;
+    //         if (!timeInitialized) {
+    //          initial_time = millis();
+    //          timeInitialized = true;
+    //         }
+    //         move(1, 10);
+    //         if (millis() - initial_time > 500) {
+    //             control_grabber_degrees(GRABBER_CLOSEDIR, GRABBER_DEGREES);
+    //             Sleep(1000);  // Wait for grabber to close
+                
+    //             // Then lift up
+    //             control_lift_arm_degrees(LIFT_LIFTDIR, LIFT_DEGREES);
+    //             Sleep(1000);  // Wait for lift to complete
+    //         } 
+    //     }
+    // }
+
+    //turn_degrees_speed(1000, 1, 70);
     if (strcmp(argv[1], "simple1") == 0) {
         printf("Mode selected: Simple 1 mineral\n");
         bool isMineralPickedUp = false;
@@ -101,22 +138,19 @@ int main(int argc, const char *argv[])
         ctx.target_assigned = 0;
         ctx.aligned_home_initial = 0;
 
+        srand(time(NULL));   // for random escape turns
         printf("Starting FSM\n");
 
-        // FSM loop
+        int g1 = getGyroAngle();
+        /* ---------- 5. Main Control Loop ---------- */
         int ticCounter = 0;
         while (ctx.match_running) {
-            // get encoder values
             int d_left, d_right;
             get_encoder_deltas(&d_left, &d_right);
-            
-            // And gyro angle
-            int gyro = getGyroAngle();
 
-            // Use encoder values plus angle to update position
+            int gyro = getGyroAngle();
             update_pose(&ctx, d_left, d_right, gyro);
-            
-            // Only print out sometimes to not spam log output
+
             if (++ticCounter % 50 == 0) {
                 if (ctx.current_state == STATE_EXPLORE) {
                     print_distance_to_target(ctx.pose, mineral_positions[ctx.target_ore_index]);
@@ -126,16 +160,16 @@ int main(int argc, const char *argv[])
                 }
                 print_pose(&ctx.pose);
             }
-            
-            // Where the interesting stuff happens :)
+
             update_state_machine(&ctx);
 
-            Sleep(20);   // 50 Hz update rate, to avoid jittery states and 'account' for noisy input from sensor.
+            Sleep(20);   // 50 Hz update rate
         }
 
         ev3_uninit();
 
         printf("Match ended, robot stopped\n");
+        //Sleep(10000);  // Wait for grabber to close
     } 
     else {
         printf("Unknown argument: %s\n", argv[1]);
