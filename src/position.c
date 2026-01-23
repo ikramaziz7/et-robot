@@ -1,7 +1,6 @@
 #include "position.h"
 #include "sensors.h"
 #include <math.h>
-#include <string.h>
 #include "state_machine.h"
 
 #define M_PI 3.14159265358979323846
@@ -10,11 +9,17 @@
 
 // In cm
 Pose mineral_positions[] = {
-    {60.0f, 0.0f, 30, 320},   
-    {60.0f, 35.0f, 30, 320},   
+    {60.0f, 0.0f, 0, 0},   
+    {120.0f, -5.0f, 0, 0},  
+    {120.0f, 30.0f, 0, 0},     
 };
 
-Pose box_position = {0.0f, 40.0f, 0, -1};
+Pose box_position = {0.0f, -40.0f, 0, 0};
+
+// Convert encoder degrees to cm
+float degrees_to_cm(int deg) {
+    return (deg / 360.0f) * WHEEL_CIRC_CM;
+}
 
 void apply_starting_position(const char *starting_position) {
     if (starting_position && strcmp(starting_position, "left") == 0) {
@@ -27,10 +32,6 @@ void apply_starting_position(const char *starting_position) {
     }
 }
 
-// Convert encoder degrees to cm
-float degrees_to_cm(int deg) {
-    return (deg / 360.0f) * WHEEL_CIRC_CM;
-}
 
 void update_pose(RobotContext *ctx, int d_left, int d_right, int gyro_deg)
 {

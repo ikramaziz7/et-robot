@@ -4,10 +4,12 @@
 #include <stdint.h>
 #include "state_machine.h"
 
+// VERY IMPORTANT offsets, for grabbing, lifting up/down, and dropping to properly work
 #define LIFT_DEGREES 500
 #define GRABBER_DEGREES 100 
 #define GRABBER_CLOSEDIR -1
 #define LIFT_LIFTDIR 1
+
 
 void move(int direction, int speed_ratio);  // 1 for forward, -1 for backward
 void turn(int direction, int speed_ratio);  // -1 for left, 1 for right
@@ -32,4 +34,4 @@ void control_grabber(int direction);
 void control_lift_arm(int direction);
 
 
-#endif // MOVEMENT_H
+#endif
