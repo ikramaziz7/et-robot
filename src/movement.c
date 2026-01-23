@@ -192,7 +192,6 @@ void turn_degrees_speed(int angle, int direction, int speed_percent) {
            speed_percent);
 }
 
-// Turn with a curve
 void start_move_with_arc(RobotContext *ctx,
                          int direction,
                          int speed_percent,
@@ -210,29 +209,28 @@ void start_move_with_arc(RobotContext *ctx,
     int max_speed;
     get_tacho_max_speed(sn_left, &max_speed);
 
-    const int CURVE_DELTA = 40;  // increase for tighter arc/curve
+    /* Curve tuning */
+    const int CURVE_DELTA = 40;  // increase for tighter arc
 
     int left_pct  = speed_percent;
     int right_pct = speed_percent;
 
     if (direction > 0) {
         left_pct -= CURVE_DELTA;          // curve left
-        if (left_pct < 10){
-            left_pct = 10;
-        } 
+        if (left_pct < 10) left_pct = 10;
     } else {
         right_pct -= CURVE_DELTA;         // curve right
-        if (right_pct < 10) {
-            right_pct = 10;
-        }
+        if (right_pct < 10) right_pct = 10;
     }
 
+    /* ---- Store motion state ---- */
     ctx->turn_active         = 1;
     ctx->turn_direction      = direction;
     ctx->turn_speed_percent  = speed_percent;
     ctx->turn_target_degrees = target_degrees;
     ctx->turn_start_gyro     = getGyroAngle();
 
+    /* ---- Forward motion with curvature ---- */
     set_tacho_speed_sp(sn_left,  -max_speed * left_pct  / 100);
     set_tacho_speed_sp(sn_right, -max_speed * right_pct / 100);
 
@@ -277,13 +275,14 @@ void start_turn(RobotContext *ctx, int degrees, int direction, int speed_percent
     get_tacho_max_speed(sn_left, &max_speed);
     int speed = max_speed * speed_percent / 100;
 
-    // use context to be able to react while within state_machine. Per FSM tick, we can act based on sensory input, even while turning
+    /* Store turn state */
     ctx->turn_active         = 1;
     ctx->turn_direction      = direction;
     ctx->turn_speed_percent  = speed_percent;
     ctx->turn_target_degrees = degrees;
     ctx->turn_start_gyro     = getGyroAngle();
 
+    /* Motor setup */
     set_tacho_stop_action_inx(sn_left,  TACHO_HOLD);
     set_tacho_stop_action_inx(sn_right, TACHO_HOLD);
 
@@ -389,6 +388,7 @@ void control_lift_arm_degrees(int direction, int degrees) {
     uint8_t sn_lift;
     int max_speed;
     
+    // Search for motor on port A or C (lift arm motor)
     if (!ev3_search_tacho_plugged_in(OUTPUT_D, 0, &sn_lift, 0)) {
         printf("Lift arm motor NOT found on port A\n");
         return;
@@ -396,14 +396,25 @@ void control_lift_arm_degrees(int direction, int degrees) {
     
     get_tacho_max_speed(sn_lift, &max_speed);
     
+    // Set stop action to hold position
     set_tacho_stop_action_inx(sn_lift, TACHO_HOLD);
     
+    // Set speed (half of max speed for controlled movement)
     int speed = max_speed / 2;
     set_tacho_speed_sp(sn_lift, speed);
     
+    // Set position target
     set_tacho_position_sp(sn_lift, degrees * direction);
     
+    // Execute movement
     set_tacho_command_inx(sn_lift, TACHO_RUN_TO_REL_POS);
+    
+    // Wait until movement complete
+    // FLAGS_T state;
+    // do {
+    //     get_tacho_state_flags(sn_lift, &state);
+    //     Sleep(10);
+    // } while (state != 0);
     
     printf("Lift arm %s by %d degrees\n", 
            direction > 0 ? "raised" : "lowered", degrees);

@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "position.h"
 
+/* ---------------- STATE ENUM ---------------- */
+
 typedef enum {
     STATE_STARTUP = 0,
     STATE_ALIGN_TARGET_POSE,
@@ -16,6 +18,7 @@ typedef enum {
     STATE_END_MATCH
 } RobotState;
 
+/* ---------------- ROBOT CONTEXT ---------------- */
 
 typedef struct RobotContext {
     RobotState current_state;
@@ -47,6 +50,7 @@ typedef struct RobotContext {
     Pose dst;
 } RobotContext;
 
+/* ---------------- FUNCTION PROTOTYPES ---------------- */
 
 void update_state_machine(RobotContext *ctx);
 void change_state(RobotContext *ctx, RobotState new_state);

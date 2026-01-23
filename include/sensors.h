@@ -27,4 +27,4 @@ void wait_for_touch(void);
 int init_all_sensors(void);
 
 
-#endif
+#endif // SENSORS_H

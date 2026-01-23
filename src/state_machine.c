@@ -6,13 +6,13 @@
 #include "time_utils.h"
 
 #define START_SPEED 5
-#define EXPLORE_SPEED      15     // percent of max speed
+#define EXPLORE_SPEED      20     // percent of max speed
 #define AVOID_SPEED      15  // percent of max speed
 #define SONAR_THRESHOLD    6  // cm for obstacle
-#define MINERAL_DIST_TARGET_THRESHOLD 15 // Distance to hard-coded coordinate (either ore or box) from current position must be met
-#define ALIGN_TARGET_INTERVAL 10000 // Only turn
-#define ALIGN_TARGET_ADJUST_INTERVAL 3000 // Drive while turn (curve)
-#define ALIGN_DEGREES_TOLERANCE 2 // Sometimes gyro reads funky values, so we dont want to always want to align
+#define MINERAL_DIST_TARGET_THRESHOLD 15
+#define ALIGN_TARGET_INTERVAL 10000
+#define ALIGN_TARGET_ADJUST_INTERVAL 3000
+#define ALIGN_DEGREES_TOLERANCE 2
 #define Sleep( msec ) usleep(( msec ) * 1000 )
 
 static void state_startup(RobotContext *ctx);
@@ -31,6 +31,7 @@ int smooth_align_turn = 0;
 int reached_offset = 0;
 
 static void state_startup(RobotContext *ctx) {
+    /* Entry actions */
     if (ctx->state_just_entered) {
         printf("[STATE] STARTUP\n");
         move(1, START_SPEED);
@@ -53,8 +54,7 @@ void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
         }
         
         start_turn(ctx, angle, direction, EXPLORE_SPEED);
-        
-        // IMPORTANT: ATM commented out, because robot doesen't always drive straight, i.e. the aligning with curvature only makes sense if robot is moving straight
+
         // if (!smooth_align_turn) {
         //     start_turn(ctx, angle, direction, EXPLORE_SPEED);
         // }
@@ -64,7 +64,6 @@ void move_to_target_position(RobotContext *ctx, Pose src_pos, Pose dst_pos) {
     } else {
         update_turn(ctx);
 
-        // IMPORTANT: ATM commented out, because robot doesen't always drive straight
         // if (!smooth_align_turn) {
         //     update_turn(ctx);
         // }
@@ -118,10 +117,11 @@ static void state_align_target_pose(RobotContext *ctx) {
 }
 
 static void state_explore(RobotContext *ctx) {
+    /* Entry actions */
     if (ctx->state_just_entered) {
         printf("[STATE] EXPLORE\n");
         curr_moving_state = STATE_EXPLORE;
-        move(1, EXPLORE_SPEED);
+        move(1, EXPLORE_SPEED);   // start forward
         ctx->state_just_entered = 0;
         ctx->state_entry_time_ms = millis();
         ctx->dst=mineral_positions[ctx->target_ore_index];
@@ -137,7 +137,7 @@ static void state_explore(RobotContext *ctx) {
         return;
     }
 
-    // Check for mineral or obstacle
+    // Check for obstacles
     float distance_to_dst = distance_to_target(ctx->pose, ctx->dst);
     int distance = getDistanceCM();
     if (distance > 0 && distance < SONAR_THRESHOLD) {
@@ -153,7 +153,6 @@ static void state_explore(RobotContext *ctx) {
         }
     }
 
-    // Align, either as a complete turn or with curve
     if (millis() - ctx->state_align_time_ms > ALIGN_TARGET_INTERVAL) {
         smooth_align_turn = 0;
         change_state(ctx, STATE_ALIGN_TARGET_POSE);
@@ -174,7 +173,6 @@ static void state_approach_mineral(RobotContext *ctx) {
         ctx->state_just_entered = 0;
     }
 
-    // Move forward for 200 ms, then pickup
     if (millis() - ctx->state_entry_time_ms >= 200) {
         stop_motors();
         change_state(ctx, STATE_PICKUP_MINERAL);
@@ -228,6 +226,7 @@ static void state_return_home(RobotContext *ctx) {
         stop_motors();
     }
 
+    // Calculate distance to the CURRENT destination (which starts as box_offset)
     float distance_to_current_dst = distance_to_target(ctx->pose, ctx->dst);
     int distance_sensor = getDistanceCM();
     if (distance_to_current_dst < MINERAL_DIST_TARGET_THRESHOLD && 
@@ -235,6 +234,25 @@ static void state_return_home(RobotContext *ctx) {
         change_state(ctx, STATE_DROP_MINERAL);
         return; // Exit early to avoid state alignment logic below
     }
+
+    // Logic to switch from OFFSET to FINAL position
+    // if (ctx->dst.x == box_offset.x && ctx->dst.y == box_offset.y) {
+    //     // If we are within a small threshold of the offset, switch to the actual box
+    //     if (distance_to_current_dst < 10) { 
+    //         printf("[STATE] RETURN HOME: Offset reached. Moving to final box position.\n");
+    //         ctx->dst = box_position;
+    //         reached_offset = 1;
+    //     }
+    // } 
+    // else {
+    //     // Step 2: We are now heading to box_position. 
+    //     // Check if we arrived at the final box to drop the mineral.
+    //     if (distance_to_current_dst < MINERAL_DIST_TARGET_THRESHOLD && 
+    //         distance_sensor > 0 && distance_sensor < SONAR_THRESHOLD) {
+    //         change_state(ctx, STATE_DROP_MINERAL);
+    //         return; // Exit early to avoid state alignment logic below
+    //     }
+    // }
 
     // Alignment and Movement Logic
     if (!ctx->aligned_home_initial || 
@@ -296,12 +314,11 @@ static void state_avoid_obstacle(RobotContext *ctx) {
     for (int i = 0; i < 100; i++) {
         move(-1, AVOID_SPEED);
     }
-
     change_state(ctx, STATE_ALIGN_TARGET_POSE);
 }
 
 static void state_end_match(RobotContext *ctx) {
-    // We never got to this ... :)
+
 }
 
 void update_state_machine(RobotContext *ctx) {
@@ -322,7 +339,7 @@ void update_state_machine(RobotContext *ctx) {
 void change_state(RobotContext *ctx, RobotState new_state) {
 
     if (ctx->current_state == new_state)
-        return; 
+        return;  // prevent unnecessary transitions
 
     ctx->previous_state = ctx->current_state;
     ctx->current_state = new_state;
