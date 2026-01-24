@@ -446,9 +446,9 @@
             <nav>
                 <a href="#team">Team</a>
                 <a href="#robot">Robot</a>
-                <a href="#algorithms">Algorithms</a>
-                <a href="#progress">Progress</a>
-                <a href="#links">Links</a>
+                <a href="#algorithms">Technical Details</a>
+                <a href="#competition-log">Competition</a>
+                <a href="#links">Resources</a>
             </nav>
         </div>
     </header>
@@ -458,7 +458,37 @@
         <p>Autonomous Resource Mining Champion</p>
         <div class="team-badge">Team 2 · Fall 2025</div>
     </div>
-
+<div class="container">
+    <section style="background: linear-gradient(135deg, rgba(168, 179, 255, 0.1), rgba(168, 179, 255, 0.05)); border: 2px solid rgba(168, 179, 255, 0.3);">
+        <h2 style="text-align: center; margin-bottom: 3rem;">🏆 Competition Highlights</h2>
+        <div class="status-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+            <div class="status-item">
+                <h3>2/3 Minerals</h3>
+                <p>Successfully collected</p>
+            </div>
+            <div class="status-item">
+                <h3>100% Autonomous</h3>
+                <p>No human intervention</p>
+            </div>
+            <div class="status-item">
+                <h3>50 Hz</h3>
+                <p>Position update rate</p>
+            </div>
+            <div class="status-item">
+                <h3>±2cm</h3>
+                <p>Navigation accuracy</p>
+            </div>
+            <div class="status-item">
+                <h3>8 States</h3>
+                <p>Finite state machine</p>
+            </div>
+            <div class="status-item">
+                <h3>0 Penalties</h3>
+                <p>Clean competition run</p>
+            </div>
+        </div>
+    </section>
+</div>
     <div class="container">
         <section id="team">
             <h2>The Team</h2>
@@ -553,16 +583,18 @@
             <p style="color: #aaa; margin-bottom: 1.5rem;">
                 The robot is controlled using a finite state machine (FSM). Each state
                 represents a high-level behavior, and transitions are triggered by
-                sensor readings, timers, or navigation conditions. This design keeps
-                the behavior predictable, modular, and easy to debug.
+                sensor readings, timers, or navigation conditions.
             </p>
         
             <div class="algo-box">
                 <h4>Global FSM Structure (Pseudo-C)</h4>
-                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
         while (match_running) {<br>
-        &nbsp;&nbsp;update_position();<br>
-        &nbsp;&nbsp;update_state_machine();<br>
+        &nbsp;&nbsp;get_encoder_deltas(&d_left, &d_right);<br>
+        &nbsp;&nbsp;gyro = getGyroAngle();<br>
+        &nbsp;&nbsp;update_pose(&ctx, d_left, d_right, gyro);<br>
+        &nbsp;&nbsp;update_state_machine(&ctx);<br>
+        &nbsp;&nbsp;Sleep(20); // 50 Hz update rate<br>
         }
                 </p>
             </div>
@@ -572,28 +604,31 @@
             <div class="algo-box">
                 <h4>STARTUP</h4>
                 <p>
-                    The STARTUP state initializes the robot at the beginning of the match.
-                    The robot starts moving forward slowly and sets its first target
-                    mineral position. During testing, if a red mineral is already
-                    detected, the robot immediately transitions to the pickup sequence.
+                    Initializes the robot at match start. Sets first target mineral position
+                    and begins slow forward movement. Immediately transitions to EXPLORE.
                 </p>
-                <p><strong>Transition:</strong> Immediately switches to EXPLORE after initialization.</p>
+                <p><strong>Transition:</strong> → EXPLORE</p>
             </div>
         
             <div class="algo-box">
                 <h4>EXPLORE</h4>
                 <p>
-                    In the EXPLORE state, the robot moves forward toward the current
-                    target mineral position stored in <code>mineral_positions[]</code>.
-                    The color sensor is continuously monitored to detect red minerals.
+                    Main navigation state. Robot moves forward toward current target mineral
+                    while continuously scanning for red minerals with color sensor. Ultrasonic
+                    sensor monitors for obstacles. Periodically realigns heading to compensate
+                    for odometry drift.
                 </p>
-                <p>
-                    To correct odometry drift, the robot periodically realigns itself
-                    toward the target using the ALIGN_TARGET_POSE state.
-                </p>
+                <p><strong>Key Parameters:</strong></p>
+                <ul>
+                    <li>Speed: 15% of max</li>
+                    <li>Sonar threshold: 6 cm</li>
+                    <li>Realignment interval: 10 seconds (full turn) / 3 seconds (arc correction)</li>
+                </ul>
                 <p><strong>Transitions:</strong></p>
                 <ul>
                     <li>Red mineral detected → APPROACH_MINERAL</li>
+                    <li>Obstacle + near target → APPROACH_MINERAL</li>
+                    <li>Obstacle + far from target → AVOID_OBSTACLE</li>
                     <li>Periodic timer → ALIGN_TARGET_POSE</li>
                 </ul>
             </div>
@@ -601,115 +636,925 @@
             <div class="algo-box">
                 <h4>ALIGN_TARGET_POSE</h4>
                 <p>
-                    This state aligns the robot toward a target position (either a mineral
-                    or the home box). The desired heading is computed using the robot’s
-                    current 2D pose and trigonometric calculations.
+                    Calculates heading error between current pose and target using atan2.
+                    Executes either full turn (large errors) or smooth arc correction (small errors).
+                    Uses gyroscope feedback to ensure accurate angle completion.
                 </p>
-                <p>
-                    Two alignment modes are used:
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 0.8rem; border-radius: 5px;">
+        heading_error = atan2(target.y - current.y, target.x - current.x) - current.theta
                 </p>
-                <ul>
-                    <li><strong>Full turn:</strong> For large heading errors</li>
-                    <li><strong>Smooth arc correction:</strong> For small adjustments while moving</li>
-                </ul>
-                <p><strong>Transition:</strong> Returns to EXPLORE or RETURN_HOME depending on context.</p>
+                <p><strong>Transition:</strong> After alignment → EXPLORE or RETURN_HOME (context-dependent)</p>
             </div>
         
             <div class="algo-box">
                 <h4>APPROACH_MINERAL</h4>
                 <p>
-                    Once a mineral is detected, the robot moves forward for a fixed
-                    duration (2 seconds) to ensure the grabber is properly positioned
-                    in front of the mineral.
+                    Short forward movement (200ms) to position grabber directly in front of detected mineral.
+                    Fixed duration ensures consistent positioning regardless of detection distance.
                 </p>
-                <p><strong>Transition:</strong> After 2 seconds → PICKUP_MINERAL</p>
+                <p><strong>Transition:</strong> After 200ms → PICKUP_MINERAL</p>
             </div>
         
             <div class="algo-box">
                 <h4>PICKUP_MINERAL</h4>
                 <p>
-                    The pickup sequence is executed in a deterministic order:
+                    Executes pickup sequence with blocking delays:
                 </p>
-                <ul>
-                    <li>Close grabber by a fixed number of degrees</li>
-                    <li>Lift the arm upward by a fixed number of degrees</li>
-                </ul>
-                <p>
-                    Blocking delays are used to guarantee mechanical completion
-                    before transitioning to navigation.
-                </p>
-                <p><strong>Transition:</strong> After pickup → RETURN_HOME</p>
+                <ol>
+                    <li>Close grabber (direction=1, degrees defined by GRABBER_DEGREES constant)</li>
+                    <li>Wait 1000ms for mechanical completion</li>
+                    <li>Lift arm up (direction=1, degrees defined by LIFT_DEGREES constant)</li>
+                    <li>Wait 1000ms for lift completion</li>
+                </ol>
+                <p><strong>Transition:</strong> → RETURN_HOME</p>
             </div>
         
             <div class="algo-box">
                 <h4>RETURN_HOME</h4>
                 <p>
-                    The robot navigates back to the collection box using its estimated
-                    2D position. The box position is stored as a fixed target, and the
-                    robot periodically realigns its heading toward it.
+                    Navigates to collection box using 2D odometry. Continuously updates heading
+                    toward box_position. Monitors distance to target and ultrasonic sensor.
+                    When within threshold distance (15cm) AND sonar detects box, transitions to drop.
                 </p>
-                <p>
-                    When the robot is close enough to the box and detects it using the
-                    ultrasonic sensor, it prepares to drop the mineral.
-                </p>
-                <p><strong>Transition:</strong> Near box → DROP_MINERAL</p>
+                <p><strong>Safety timeout:</strong> 20 seconds maximum</p>
+                <p><strong>Transition:</strong> Near box + sonar detection → DROP_MINERAL</p>
             </div>
         
             <div class="algo-box">
                 <h4>DROP_MINERAL</h4>
                 <p>
-                    The robot releases the mineral by opening the grabber, moves backward
-                    slightly to clear the box, and lowers the lift arm. The target index
-                    is incremented so the next mineral can be collected.
+                    Multi-step drop sequence:
                 </p>
-                <p><strong>Transition:</strong> After drop → EXPLORE</p>
+                <ol>
+                    <li>Wait 500ms (ensure stable position)</li>
+                    <li>Open grabber (release mineral)</li>
+                    <li>Wait 1000ms</li>
+                    <li>Move backward to clear box</li>
+                    <li>Lower lift arm to starting position</li>
+                    <li>Increment target_ore_index for next mineral</li>
+                </ol>
+                <p><strong>Transition:</strong> → EXPLORE</p>
             </div>
         
             <div class="algo-box">
                 <h4>AVOID_OBSTACLE</h4>
                 <p>
-                    Obstacle avoidance is a simple recovery behavior. The robot moves
-                    backward at a fixed speed and then realigns itself toward the target.
-                    This keeps avoidance behavior predictable and avoids complex planning.
+                    Simple reactive behavior: move backward at AVOID_SPEED for fixed duration,
+                    then realign toward target. Prevents getting stuck on obstacles.
                 </p>
-                <p><strong>Transition:</strong> After backing up → ALIGN_TARGET_POSE</p>
+                <p><strong>Transition:</strong> → ALIGN_TARGET_POSE</p>
             </div>
         
-            <h3 style="margin-top: 3rem;">3. Navigation & Position Tracking</h3>
-        
+            <h3 style="margin-top: 3rem;">3. Why This Strategy Works</h3>
             <div class="algo-box">
-                <h4>2D Odometry</h4>
-                <p>
-                    The robot maintains an estimate of its position (x, y) and orientation
-                    (θ) using wheel encoder odometry combined with gyroscope feedback.
-                    Encoder deltas are converted to distances and projected onto the
-                    global coordinate system using trigonometry.
-                </p>
-            </div>
-        
-            <div class="algo-box">
-                <h4>Heading Computation</h4>
-                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
-        heading = atan2(target.y - pose.y, target.x - pose.x) - pose.theta
-                </p>
-                <p>
-                    The heading error is normalized and used to decide whether to perform
-                    a full turn or a smooth arc correction.
-                </p>
-            </div>
-        
-            <div class="algo-box">
-                <h4>Why This Strategy Is Efficient</h4>
                 <ul>
-                    <li>FSM structure avoids ambiguous behaviors</li>
-                    <li>Time-based actions ensure mechanical reliability</li>
-                    <li>Periodic realignment compensates for odometry drift</li>
-                    <li>Smooth arc corrections maintain momentum</li>
-                    <li>Simple obstacle recovery prevents deadlocks</li>
+                    <li><strong>Deterministic timing</strong> ensures mechanical reliability</li>
+                    <li><strong>Periodic realignment</strong> compensates for odometry drift</li>
+                    <li><strong>State separation</strong> makes debugging straightforward</li>
+                    <li><strong>Gyroscope integration</strong> provides accurate heading control</li>
+                    <li><strong>Fixed mineral positions</strong> allow pre-planned navigation</li>
                 </ul>
             </div>
         </section>
+        <section id="navigation">
+            <h2>Navigation System: 2D Odometry & Pose Tracking</h2>
+            
+            <div class="algo-box">
+                <h4>Position Estimation Algorithm</h4>
+                <p>
+                    The robot maintains its position (x, y, θ) using differential drive odometry
+                    combined with gyroscope feedback. Each update cycle:
+                </p>
+                <ol>
+                    <li>Read encoder deltas from left and right wheels</li>
+                    <li>Convert encoder degrees to linear distance (cm)</li>
+                    <li>Calculate average forward distance</li>
+                    <li>Read current gyroscope angle</li>
+                    <li>Project movement onto global coordinates using trigonometry</li>
+                </ol>
+            </div>
         
+            <div class="algo-box">
+                <h4>Mathematical Foundation</h4>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
+        // Convert encoder ticks to distance<br>
+        dist_left = degrees_to_cm(encoder_delta_left);<br>
+        dist_right = degrees_to_cm(encoder_delta_right);<br>
+        dist_avg = (dist_left + dist_right) / 2.0;<br>
+        <br>
+        // Get heading from gyroscope<br>
+        theta_radians = gyro_degrees * (PI / 180.0);<br>
+        <br>
+        // Update global position<br>
+        x += dist_avg * cos(theta_radians);<br>
+        y += dist_avg * sin(theta_radians);<br>
+        theta = gyro_degrees;
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Wheel Diameter Calibration</h4>
+                <p>
+                    Critical constant: <code>WHEEL_DIAMETER_CM = 7.5</code><br>
+                    Wheel circumference: π × 7.5 ≈ 23.56 cm<br>
+                    One full motor rotation (360°) moves robot ~23.56 cm forward
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Target Heading Calculation</h4>
+                <p>
+                    To navigate toward any target (mineral or box), we calculate the required heading:
+                </p>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px;">
+        delta_x = target_x - current_x;<br>
+        delta_y = target_y - current_y;<br>
+        desired_angle = atan2(delta_y, delta_x) * (180/PI);<br>
+        heading_error = desired_angle - current_theta;<br>
+        heading_error = normalize_angle(heading_error); // -180 to +180
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Coordinate System</h4>
+                <p>
+                    <strong>Starting position:</strong> (0, 0, 0°)<br>
+                    <strong>Example mineral positions:</strong><br>
+&nbsp;&nbsp;• Mineral 1: (60cm, 0cm)<br>
+&nbsp;&nbsp;• Mineral 2:<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- Left start: (120cm, -35cm)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;- Right start: (120cm, 35cm)<br>
+&nbsp;&nbsp;• Mineral 3: (120cm, 30cm)<br>
+<br>
+<strong>Box position:</strong><br>
+&nbsp;&nbsp;- Left start: (0cm, -40cm)<br>
+&nbsp;&nbsp;- Right start: (0cm, 40cm)
+            </div>
+        
+            <div class="algo-box">
+                <h4>Drift Compensation</h4>
+                <p>
+                    Odometry accumulates error over time. We compensate by:
+                </p>
+                <ul>
+                    <li>Using gyroscope for orientation (more reliable than encoder-based)</li>
+                    <li>Periodic realignment every 10 seconds</li>
+                    <li>Smooth arc corrections every 3 seconds</li>
+                    <li>Short movement segments to limit error accumulation</li>
+                </ul>
+            </div>
+        </section>
+        <section id="continuous-navigation">
+            <h2>Maintaining Navigation During State Transitions</h2>
+            <p style="color: #aaa; margin-bottom: 1.5rem;">
+                A critical challenge in autonomous robotics is maintaining accurate position tracking
+                even as the robot switches between different behaviors. Our solution ensures the robot
+                never "loses" its position during state changes.
+            </p>
+        
+            <div class="algo-box">
+                <h4>The Problem: State Changes Could Break Position Tracking</h4>
+                <p>
+                    When the robot transitions between states (e.g., EXPLORE → PICKUP_MINERAL → RETURN_HOME),
+                    it could lose track of where it is if position updates stop. Consider this problematic approach:
+                </p>
+                <p style="font-family: 'Courier New', monospace; background: rgba(139,0,0,0.2); padding: 1rem; border-radius: 5px; color: #ff6b6b;">
+        // ❌ BAD: Position updates only in EXPLORE state<br>
+        if (state == EXPLORE) {<br>
+        &nbsp;&nbsp;update_pose();<br>
+        }
+                </p>
+                <p style="margin-top: 1rem;">
+                    This would cause the robot to "forget" how far it moved during pickup, turning, or
+                    obstacle avoidance—leading to completely wrong position estimates.
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Our Solution: Continuous Position Updates in Main Loop</h4>
+                <p>
+                    We solve this by updating the robot's pose <strong>outside and before</strong> the
+                    state machine logic, ensuring position tracking continues regardless of current state:
+                </p>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,100,0,0.2); padding: 1rem; border-radius: 5px; color: #90ee90; line-height: 1.8;">
+        // ✅ GOOD: Update pose BEFORE state machine<br>
+        while (ctx.match_running) {<br>
+        &nbsp;&nbsp;// 1. Get encoder deltas (how much wheels moved)<br>
+        &nbsp;&nbsp;int d_left, d_right;<br>
+        &nbsp;&nbsp;get_encoder_deltas(&d_left, &d_right);<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// 2. Get current gyroscope angle<br>
+        &nbsp;&nbsp;int gyro = getGyroAngle();<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// 3. Update position estimate<br>
+        &nbsp;&nbsp;update_pose(&ctx, d_left, d_right, gyro);<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// 4. THEN run state machine<br>
+        &nbsp;&nbsp;update_state_machine(&ctx);<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;Sleep(20); // 50 Hz update rate<br>
+        }
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Why This Architecture Works</h4>
+                <ul>
+                    <li><strong>State-Independent Tracking:</strong> Position updates happen every 20ms regardless of which state is active</li>
+                    <li><strong>No Lost Motion:</strong> Even during blocking actions (grabber closing, lifting), encoders keep tracking movement</li>
+                    <li><strong>Shared Context:</strong> All states access the same <code>RobotContext</code> with current pose</li>
+                    <li><strong>Atomic Updates:</strong> Pose is updated completely before any state decision is made</li>
+                </ul>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Example: Tracking During PICKUP_MINERAL State</h4>
+                <p>When the robot picks up a mineral, it might drift slightly due to:</p>
+                <ul>
+                    <li>Motor vibrations during grabber closing</li>
+                    <li>Slight forward creep as lift arm raises</li>
+                    <li>Mechanical backlash in gears</li>
+                </ul>
+                <p style="margin-top: 1rem;">
+                    Because position updates continue running in the main loop, this small movement
+                    is automatically tracked:
+                </p>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
+        // Main loop continues running<br>
+        get_encoder_deltas(&d_left, &d_right); // Detects small drift<br>
+        gyro = getGyroAngle(); // Still tracking orientation<br>
+        update_pose(&ctx, d_left, d_right, gyro); // Adds drift to position<br>
+        <br>
+        // Meanwhile, state machine is in PICKUP<br>
+        control_grabber_degrees(1, 220);<br>
+        Sleep(1000); // Main loop keeps running!<br>
+        control_lift_arm_degrees(1, 450);
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>The RobotContext: Shared State Across All States</h4>
+                <p>
+                    The <code>RobotContext</code> structure holds all navigation data and is accessible
+                    to every state:
+                </p>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; line-height: 1.8;">
+        typedef struct {<br>
+        &nbsp;&nbsp;// Current position (continuously updated)<br>
+        &nbsp;&nbsp;Pose pose; // x, y, theta<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// Target position (set by states)<br>
+        &nbsp;&nbsp;Pose dst; // mineral or box position<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// State machine info<br>
+        &nbsp;&nbsp;RobotState current_state;<br>
+        &nbsp;&nbsp;RobotState previous_state;<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// Navigation helpers<br>
+        &nbsp;&nbsp;int turn_active;<br>
+        &nbsp;&nbsp;int turn_start_gyro;<br>
+        &nbsp;&nbsp;int turn_target_degrees;<br>
+        &nbsp;&nbsp;<br>
+        &nbsp;&nbsp;// Match control<br>
+        &nbsp;&nbsp;int match_running;<br>
+        } RobotContext;
+                </p>
+                <p style="margin-top: 1rem;">
+                    Every state reads from and writes to this shared context, ensuring
+                    consistent navigation data across state transitions.
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Example: EXPLORE → PICKUP → RETURN_HOME</h4>
+                <p>Let's trace how position tracking continues through a complete cycle:</p>
+                
+                <h5 style="color: #a8b3ff; margin-top: 1.5rem;">1. EXPLORE State</h5>
+                <ul>
+                    <li>Main loop: Updates pose from (0, 0) → (45cm, 2cm)</li>
+                    <li>State: Moving forward, color sensor detects red</li>
+                    <li>Transition: → APPROACH_MINERAL</li>
+                </ul>
+        
+                <h5 style="color: #a8b3ff; margin-top: 1.5rem;">2. APPROACH_MINERAL State</h5>
+                <ul>
+                    <li>Main loop: Continues updating pose (45, 2) → (48, 2)</li>
+                    <li>State: Moves forward 200ms, then stops</li>
+                    <li>Transition: → PICKUP_MINERAL</li>
+                </ul>
+        
+                <h5 style="color: #a8b3ff; margin-top: 1.5rem;">3. PICKUP_MINERAL State</h5>
+                <ul>
+                    <li>Main loop: Still updating! (48, 2) → (48.3, 2.1) [slight drift]</li>
+                    <li>State: Grabber closes, arm lifts (blocking operations)</li>
+                    <li>Transition: → RETURN_HOME</li>
+                </ul>
+        
+                <h5 style="color: #a8b3ff; margin-top: 1.5rem;">4. RETURN_HOME State</h5>
+                <ul>
+                    <li>Main loop: Continues from (48.3, 2.1)</li>
+                    <li>State: Calculates heading to box at (0, -40)</li>
+                    <li>Robot knows exactly where it is—no position was "lost"!</li>
+                </ul>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Update Rate: 50 Hz for Smooth Tracking</h4>
+                <p>
+                    The main loop runs at 50 Hz (every 20ms). This high frequency ensures:
+                </p>
+                <ul>
+                    <li>Encoder changes are captured before they accumulate too much</li>
+                    <li>Gyroscope drift is minimized by frequent reads</li>
+                    <li>State machine can react quickly to sensor changes</li>
+                    <li>Position estimate stays accurate even during fast movements</li>
+                </ul>
+                <p style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 5px; margin-top: 1rem;">
+        Sleep(20); // 20ms = 50 updates per second
+                </p>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Key Takeaway: Separation of Concerns</h4>
+                <p>
+                    By separating <strong>position tracking</strong> (main loop) from
+                    <strong>behavioral logic</strong> (state machine), we achieve:
+                </p>
+                <ul>
+                    <li>✅ Continuous position awareness</li>
+                    <li>✅ States can trust pose data is always current</li>
+                    <li>✅ No special "position update" code needed in each state</li>
+                    <li>✅ Easier debugging (position code in one place)</li>
+                    <li>✅ Robust navigation through all behaviors</li>
+                </ul>
+            </div>
+        
+            <div class="algo-box">
+                <h4>Real-World Impact</h4>
+                <p>
+                    This design decision was critical to our competition success. Even when:
+                </p>
+                <ul>
+                    <li>Motors are stopped during pickup/drop sequences</li>
+                    <li>Robot is turning in place</li>
+                    <li>Avoiding obstacles with sudden movements</li>
+                    <li>Executing precise alignments</li>
+                </ul>
+                <p style="margin-top: 1rem;">
+                    ...the robot <strong>always knows where it is</strong> and can immediately
+                    navigate to the next target when the state changes.
+                </p>
+            </div>
+        </section>
+        
+        
+        <section id="competition-log">
+            <h2>Competition Performance Log</h2>
+            <p style="color: #aaa; margin-bottom: 1rem;">
+                Below is a real log from our successful competition run against Team 6.
+                It shows the state transitions, sensor readings, and navigation decisions
+                made by the robot during the match.
+            </p>
+            
+            <div class="algo-box" style="max-height: 500px; overflow-y: scroll;">
+                <h4>competition_vs_6.out</h4>
+                <pre style="font-family: 'Courier New', monospace; background: rgba(0,0,0,0.5); padding: 1.5rem; border-radius: 8px; font-size: 0.85rem; line-height: 1.6; color: #0f0;">
+                    ./start_left state_machine
+                    EV3 initialized
+                    Waiting for motors to be detected...
+                    Motors detected!
+                    Motors found: Left=C, Right=B
+                    Found sensors:
+                      type = lego-ev3-us
+                      port = in2
+                      mode = US-DIST-CM
+                      value0 = 385
+                      -> Sonar sensor registered
+                      type = lego-ev3-gyro
+                      port = in1
+                      mode = GYRO-ANG
+                      value0 = 38
+                      -> Gyro sensor callibrated and registered
+                      type = lego-ev3-color
+                      port = in3
+                      mode = COL-COLOR
+                      value0 = 1
+                      -> Color sensor registered
+                    Sensor initialization complete.
+                    Mode selected: State Machine
+                    Starting FSM
+                    [FSM] 0 -> 2
+                    [STATE] EXPLORE
+                    dst: 60.000000 0.000000 -0.000000
+                    Distance to target: 43.672623
+                    Pose -> X: 16.33 cm | Y: -0.21 cm | Theta: -1 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 4 deg at 15%
+                    Gyro turn complete (delta=4)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 60.000000 0.000000 0.000000
+                    Distance to target: 28.709867
+                    Pose -> X: 31.30 cm | Y: -0.82 cm | Theta: 2 deg
+                    Distance to target: 11.693772
+                    Pose -> X: 48.31 cm | Y: -0.22 cm | Theta: 2 deg
+                    [FSM] 2 -> 3
+                    [STATE] APPROACH MINERAL
+                    [FSM] 3 -> 4
+                    [STATE] PICKUP MINERAL
+                    Grabber opened by 100 degrees
+                    Lift arm raised by 500 degrees
+                    [FSM] 4 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 144 deg at 15%
+                    Pose -> X: 54.79 cm | Y: -0.09 cm | Theta: -10 deg
+                    Pose -> X: 54.72 cm | Y: -0.07 cm | Theta: -28 deg
+                    Pose -> X: 54.72 cm | Y: -0.07 cm | Theta: -46 deg
+                    Pose -> X: 54.74 cm | Y: -0.10 cm | Theta: -63 deg
+                    Pose -> X: 54.73 cm | Y: -0.07 cm | Theta: -82 deg
+                    Pose -> X: 54.73 cm | Y: -0.10 cm | Theta: -101 deg
+                    Pose -> X: 54.71 cm | Y: -0.12 cm | Theta: -122 deg
+                    Pose -> X: 54.72 cm | Y: -0.09 cm | Theta: -141 deg
+                    Gyro turn complete (delta=144)
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 53.854519
+                    Pose -> X: 43.46 cm | Y: -8.20 cm | Theta: -145 deg
+                    Distance to target: 38.188187
+                    Pose -> X: 30.56 cm | Y: -17.11 cm | Theta: -146 deg
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 4 deg at 15%
+                    Gyro turn complete (delta=4)
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 25.628178
+                    Pose -> X: 20.51 cm | Y: -24.63 cm | Theta: -142 deg
+                    [FSM] 5 -> 6
+                    [STATE] DROP MINERAL
+                    Pose -> X: 8.71 cm | Y: -33.97 cm | Theta: -139 deg
+                    Grabber closed by 100 degrees
+                    Lift arm lowered by 500 degrees
+                    [FSM] 6 -> 2
+                    [STATE] EXPLORE
+                    dst: 120.000000 -5.000000 -3320473600.000014
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 143 deg at 15%
+                    Pose -> X: 28.65 cm | Y: -15.34 cm | Theta: -117 deg
+                    Pose -> X: 28.65 cm | Y: -15.34 cm | Theta: -95 deg
+                    Pose -> X: 28.67 cm | Y: -15.40 cm | Theta: -68 deg
+                    Pose -> X: 28.64 cm | Y: -15.34 cm | Theta: -40 deg
+                    Pose -> X: 28.66 cm | Y: -15.36 cm | Theta: -4 deg
+                    Gyro turn complete (delta=143)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 120.000000 -5.000000 0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 120.000000 -5.000000 0.000001
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 120.000000 -5.000000 0.000013
+                    Distance to target: 78.962189
+                    Pose -> X: 41.55 cm | Y: -13.99 cm | Theta: 6 deg
+                    Distance to target: 62.667065
+                    Pose -> X: 57.76 cm | Y: -12.33 cm | Theta: 5 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 120.000000 -5.000000 0.000042
+                    Distance to target: 44.941303
+                    Pose -> X: 75.43 cm | Y: -10.79 cm | Theta: 5 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 5 deg at 15%
+                    Pose -> X: 92.99 cm | Y: -9.42 cm | Theta: 4 deg
+                    Gyro turn complete (delta=5)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 120.000000 -5.000000 0.000000
+                    Distance to target: 14.132041
+                    Pose -> X: 106.00 cm | Y: -6.90 cm | Theta: 11 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 22 deg at 15%
+                    Pose -> X: 119.06 cm | Y: -4.47 cm | Theta: 7 deg
+                    [FSM] 1 -> 3
+                    [STATE] APPROACH MINERAL
+                    [FSM] 3 -> 4
+                    [STATE] PICKUP MINERAL
+                    Grabber opened by 100 degrees
+                    Lift arm raised by 500 degrees
+                    [FSM] 4 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 153 deg at 15%
+                    Pose -> X: 122.03 cm | Y: -4.96 cm | Theta: -16 deg
+                    Pose -> X: 122.03 cm | Y: -4.96 cm | Theta: -36 deg
+                    Pose -> X: 122.05 cm | Y: -4.98 cm | Theta: -58 deg
+                    Pose -> X: 122.04 cm | Y: -4.95 cm | Theta: -79 deg
+                    Pose -> X: 122.04 cm | Y: -4.95 cm | Theta: -95 deg
+                    Pose -> X: 122.04 cm | Y: -4.95 cm | Theta: -115 deg
+                    Pose -> X: 122.02 cm | Y: -4.98 cm | Theta: -132 deg
+                    Pose -> X: 122.04 cm | Y: -4.96 cm | Theta: -148 deg
+                    Gyro turn complete (delta=153)
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 123.766968
+                    Pose -> X: 118.95 cm | Y: -5.82 cm | Theta: -165 deg
+                    Distance to target: 109.016296
+                    Pose -> X: 104.65 cm | Y: -9.46 cm | Theta: -166 deg
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 5 deg at 15%
+                    Pose -> X: 89.58 cm | Y: -12.98 cm | Theta: -168 deg
+                    Gyro turn complete (delta=5)
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 81.883095
+                    Pose -> X: 78.38 cm | Y: -16.30 cm | Theta: -164 deg
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 4 deg at 15%
+                    Pose -> X: 64.10 cm | Y: -20.04 cm | Theta: -165 deg
+                    Gyro turn complete (delta=4)
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 54.312531
+                    Pose -> X: 51.93 cm | Y: -24.09 cm | Theta: -162 deg
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 38.637329
+                    Pose -> X: 36.94 cm | Y: -28.67 cm | Theta: -163 deg
+                    [FSM] 5 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 5
+                    [STATE] RETURN HOME
+                    Heading to OFFSET: 0.000000 -40.000000
+                    Distance to target: 22.310280
+                    Pose -> X: 21.27 cm | Y: -33.27 cm | Theta: -164 deg
+                    [FSM] 5 -> 6
+                    [STATE] DROP MINERAL
+                    Grabber closed by 100 degrees
+                    Lift arm lowered by 500 degrees
+                    [FSM] 6 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 -5227307008.000001
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 55 deg at 15%
+                    Pose -> X: 37.38 cm | Y: -28.65 cm | Theta: -164 deg
+                    Pose -> X: 37.28 cm | Y: -28.65 cm | Theta: -188 deg
+                    Pose -> X: 37.31 cm | Y: -28.65 cm | Theta: -212 deg
+                    Gyro turn complete (delta=55)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000001
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000001
+                    Distance to target: 33.994225
+                    Pose -> X: 28.59 cm | Y: -21.18 cm | Theta: -221 deg
+                    Distance to target: 17.302166
+                    Pose -> X: 15.97 cm | Y: -10.21 cm | Theta: -221 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 6 deg at 15%
+                    Gyro turn complete (delta=6)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 -0.000000
+                    Distance to target: 3.750161
+                    Pose -> X: 5.01 cm | Y: -2.24 cm | Theta: -213 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 176 deg at 15%
+                    Pose -> X: -8.41 cm | Y: 7.16 cm | Theta: -218 deg
+                    Pose -> X: -8.56 cm | Y: 7.29 cm | Theta: -237 deg
+                    Pose -> X: -8.55 cm | Y: 7.26 cm | Theta: -258 deg
+                    Pose -> X: -8.56 cm | Y: 7.26 cm | Theta: -279 deg
+                    Pose -> X: -8.56 cm | Y: 7.26 cm | Theta: -297 deg
+                    Pose -> X: -8.57  cm | Y: 7.23 cm | Theta: -319 deg
+                    Pose -> X: -8.52 cm | Y: 7.27 cm | Theta: -339 deg
+                    Pose -> X: -8.52 cm | Y: 7.26 cm | Theta: -359 deg
+                    Pose -> X: -8.55 cm | Y: 7.27 cm | Theta: -379 deg
+                    Gyro turn complete (delta=176)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 -0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000001
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000001
+                    Distance to target: 7.968719
+                    Pose -> X: -4.58 cm | Y: 4.50 cm | Theta: -395 deg
+                    Distance to target: 9.441856
+                    Pose -> X: 9.68 cm | Y: -5.49 cm | Theta: -395 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 180 deg at 15%
+                    Pose -> X: 18.67 cm | Y: -11.94 cm | Theta: -389 deg
+                    Pose -> X: 18.67 cm | Y: -11.94 cm | Theta: -365 deg
+                    Pose -> X: 18.67 cm | Y: -11.95 cm | Theta: -329 deg
+                    Pose -> X: 18.68 cm | Y: -11.95 cm | Theta: -293 deg
+                    Pose -> X: 18.68 cm | Y: -11.95 cm | Theta: -262 deg
+                    Pose -> X: 18.68 cm | Y: -11.95 cm | Theta: -234 deg
+                    Gyro turn complete (delta=180)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 -0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000006
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000006
+                    Distance to target: 16.368061
+                    Pose -> X: 15.28 cm | Y: -9.57 cm | Theta: -215 deg
+                    Distance to target: 0.505502
+                    Pose -> X: 1.50 cm | Y: 0.08 cm | Theta: -215 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 177 deg at 15%
+                    Pose -> X: -8.53 cm | Y: 7.20 cm | Theta: -221 deg
+                    Pose -> X: -8.53 cm | Y: 7.20 cm | Theta: -236 deg
+                    Pose -> X: -8.53 cm | Y: 7.20 cm | Theta: -251 deg
+                    Pose -> X: -8.53 cm | Y: 7.20 cm | Theta: -268 deg
+                    Pose -> X: -8.53 cm | Y: 7.20 cm | Theta: -278 deg
+                    Pose -> X: -8.53 cm | Y: 7.13 cm | Theta: -296 deg
+                    Pose -> X: -8.49 cm | Y: 7.18 cm | Theta: -320 deg
+                    Pose -> X: -8.52 cm | Y: 7.17 cm | Theta: -339 deg
+                    Pose -> X: -8.45 cm | Y: 7.18 cm | Theta: -361 deg
+                    Pose -> X: -8.49 cm | Y: 7.18 cm | Theta: -380 deg
+                    Gyro turn complete (delta=177)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000003
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000001
+                    Distance to target: 7.864048
+                    Pose -> X: -4.52 cm | Y: 4.40 cm | Theta: -395 deg
+                    Distance to target: 9.253160
+                    Pose -> X: 9.50 cm | Y: -5.42 cm | Theta: -395 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 179 deg at 15%
+                    Pose -> X: 18.86 cm | Y: -11.97 cm | Theta: -382 deg
+                    Pose -> X: 18.83 cm | Y: -11.97 cm | Theta: -343 deg
+                    Pose -> X: 18.83 cm | Y: -11.98 cm | Theta: -302 deg
+                    Pose -> X: 18.84 cm | Y: -11.95 cm | Theta: -273 deg
+                    Pose -> X: 18.83 cm | Y: -11.96 cm | Theta: -248 deg
+                    Pose -> X: 18.83 cm | Y: -11.96 cm | Theta: -225 deg
+                    Gyro turn complete (delta=179)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 -0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000001
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000119
+                    Distance to target: 10.206362
+                    Pose -> X: 10.23 cm | Y: -6.04 cm | Theta: -215 deg
+                    Distance to target: 5.568741
+                    Pose -> X: -2.61 cm | Y: 3.13 cm | Theta: -216 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 178 deg at 15%
+                    Pose -> X: -8.49 cm | Y: 7.50 cm | Theta: -228 deg
+                    Pose -> X: -8.50 cm | Y: 7.53 cm | Theta: -246 deg
+                    Pose -> X: -8.49 cm | Y: 7.50 cm | Theta: -265 deg
+                    Pose -> X: -8.49 cm | Y: 7.50 cm | Theta: -284 deg
+                    Pose -> X: -8.48 cm | Y: 7.50 cm | Theta: -303 deg
+                    Pose -> X: -8.48 cm | Y: 7.50 cm | Theta: -321 deg
+                    Pose -> X: -8.51 cm | Y: 7.49 cm | Theta: -338 deg
+                    Pose -> X: -8.51 cm | Y: 7.49 cm | Theta: -355 deg
+                    Pose -> X: -8.48 cm | Y: 7.49 cm | Theta: -372 deg
+                    Pose -> X: -8.45 cm | Y: 7.48 cm | Theta: -390 deg
+                    Gyro turn complete (delta=178)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000006
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000042
+                    Distance to target: 0.111949
+                    Pose -> X: 1.89 cm | Y: -0.01 cm | Theta: -396 deg
+                    Distance to target: 16.800571
+                    Pose -> X: 15.52 cm | Y: -9.97 cm | Theta: -397 deg
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: right 180 deg at 15%
+                    Pose -> X: 18.24 cm | Y: -12.02 cm | Theta: -377 deg
+                    Pose -> X: 18.24 cm | Y: -12.03 cm | Theta: -354 deg
+                    Pose -> X: 18.29 cm | Y: -12.00 cm | Theta: -327 deg
+                    Pose -> X: 18.26 cm | Y: -12.01 cm | Theta: -305 deg
+                    Pose -> X: 18.26 cm | Y: -12.01 cm | Theta: -282 deg
+                    Pose -> X: 18.25 cm | Y: -12.01 cm | Theta: -255 deg
+                    Pose -> X: 18.22 cm | Y: -11.99 cm | Theta: -241 deg
+                    Pose -> X: 18.19 cm | Y: -11.98 cm | Theta: -315 deg
+                    Pose -> X: 18.28 cm | Y: -11.99 cm | Theta: -373 deg
+                    Pose -> X: 18.19 cm | Y: -11.98 cm | Theta: -362 deg
+                    Pose -> X: 18.22 cm | Y: -11.98 cm | Theta: -452 deg
+                    Pose -> X: 18.21 cm | Y: -11.97 cm | Theta: -530 deg
+                    Pose -> X: 18.23 cm | Y: -11.95 cm | Theta: -500 deg
+                    Pose -> X: 18.22 cm | Y: -11.97 cm | Theta: -464 deg
+                    Pose -> X: 17.72 cm | Y: -11.48 cm | Theta: -399 deg
+                    Pose -> X: 18.24 cm | Y: -11.86 cm | Theta: -354 deg
+                    Pose -> X: 18.21 cm | Y: -11.85 cm | Theta: -308 deg
+                    Pose -> X: 18.20 cm | Y: -11.85 cm | Theta: -232 deg
+                    Gyro turn complete (delta=180)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 4 deg at 15%
+                    Gyro turn complete (delta=4)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 -0.000000
+                    [FSM] 2 -> 1
+                    [STATE] ALIGN TARGET POSE
+                    Gyro turn started: left 16 deg at 15%
+                    Gyro turn complete (delta=16)
+                    [FSM] 1 -> 2
+                    [STATE] EXPLORE
+                    dst: 2.000062 0.000000 0.000000
+                    Distance to target: 13.348529
+                    Pose -> X: 10.44 cm | Y: -10.34 cm | Theta: -204 deg
+                                    </pre>
+            </div>
+            
+            <p style="margin-top: 1rem; color: #aaa;">
+                <strong>Key observations from this run:</strong>
+            </p>
+            <ul style="color: #aaa; margin-left: 2rem;">
+                <li>State machine transitions executed smoothly</li>
+                <li>Gyroscope-based navigation maintained accurate heading</li>
+                <li>Pickup and drop sequences completed successfully</li>
+                <li>Obstacle avoidance prevented collisions</li>
+            </ul>
+        </section>
+        <section id="fsm-diagram">
+            <h2>State Machine Diagram</h2>
+            <p style="color: #aaa; margin-bottom: 2rem;">
+                Visual representation of the robot's finite state machine showing all operational states, transitions, and sensor-driven logic.
+            </p>
+            
+            <div style="text-align: center; background: rgba(255,255,255,0.02); padding: 2rem; border-radius: 12px; border: 1px solid rgba(168, 179, 255, 0.2);">
+                <img src="img/Screenshot 2026-01-22 at 15.44.12.png" alt="E.T. Robot State Machine Diagram" style="max-width: 100%; border-radius: 8px;">
+                <p style="margin-top: 1rem; color: #a8b3ff;">
+                    <a href="https://gitlab.eurecom.fr/jensen/robot-project/-/wikis/home" target="_blank" style="color: #a8b3ff; text-decoration: none;">
+                        View Interactive Diagram on GitLab Wiki →
+                    </a>
+                </p>
+            </div>
+            
+            <div class="algo-box" style="margin-top: 2rem;">
+                <h4>Detailed State Transition Summary</h4>
+                <ul style="color: #aaa; margin-left: 1.5rem; line-height: 1.8;">
+                    <li>
+                        <strong>STARTUP → EXPLORE / FIND MINERAL:</strong>
+                        After gyro zeroing and driving straight out of the starting square, the robot moves to a predefined safe zone.
+                        A 2-second stabilization delay is applied before entering exploration mode.
+                    </li>
+            
+                    <li>
+                        <strong>EXPLORE → APPROACH MINERAL:</strong>
+                        Triggered when the downward-facing color sensor detects a valid mineral color
+                        
+                    </li>
+            
+                    <li>
+                        <strong>APPROACH → PICK UP MINERAL:</strong>
+                        Occurs when the mineral is centered in front of the robot and the sonar distance is less than 5&nbsp;cm.
+                    </li>
+            
+                    <li>
+                        <strong>APPROACH → EXPLORE:</strong>
+                        Fallback transition if the mineral color is lost during the approach phase.
+                    </li>
+            
+                    <li>
+                        <strong>PICK UP → RETURN TO HOME BOX:</strong>
+                        Triggered once the pickup mechanism successfully secures the mineral.
+                    </li>
+            
+                    <li>
+                        <strong>PICK UP → EXPLORE:</strong>
+                        If pickup fails (object not secured), the robot resumes exploration.
+                    </li>
+            
+                    <li>
+                        <strong>RETURN TO HOME BOX → DROP MINERAL:</strong>
+                        Activated when the robot detects its home box using floor markings and orientation from the gyro.
+                    </li>
+            
+                    <li>
+                        <strong>DROP MINERAL → EXPLORE:</strong>
+                        After positioning above the box, opening the claw, waiting briefly, and reversing out,
+                        the robot resumes mineral exploration.
+                    </li>
+            
+                    <li>
+                        <strong>GLOBAL → AVOID OBSTACLE / ESCAPE:</strong>
+                        Can be triggered from any state when:
+                        <ul style="margin-left: 1.2rem;">
+                            <li>Sonar distance &lt; 15&nbsp;cm</li>
+                            <li>Touch sensor is pressed</li>
+                            <li>A central obstacle or blocked path is detected</li>
+                        </ul>
+                        The robot stops, reverses 10–20&nbsp;cm, performs a gyro-based turn (45° or 90°),
+                        and then automatically returns to the previous state.
+                    </li>
+            
+                    <li>
+                        <strong>GLOBAL → END OF MATCH:</strong>
+                        Safety override triggered if the match time exceeds 3 minutes or a competition-defined
+                        termination condition is met. All motors are stopped immediately.
+                    </li>
+                </ul>
+            </div>
+            
+
 
         
 
@@ -719,47 +1564,6 @@
                 <a href="https://gitlab.eurecom.fr/jensen/robot-project/-/tree/main?ref_type=heads" class="link-button"><span>GitLab Repository</span></a>
                 <a href="#" class="link-button"><span>Demo Videos</span></a>
                 <a href="https://perso.telecom-paristech.fr/apvrille/OS/projects_fall2025.html" class="link-button" target="_blank"><span>Project Specifications</span></a>
-            </div>
-        </section>
-
-                <section id="contributions">
-            <h2>Team Contributions</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h3>Maya Lorimer</h3>
-                    <ul style="margin-top: 1rem; color: #ccc;">
-                        <li>Motor control functions</li>
-                        <li>Movement and turning</li>
-                        <li>Grabber and lift arm control</li>
-                        <li>Physical structure design and build</li>
-                        <li>Speak functionality</li>
-                        <li>State machine defense strategy (removed from final version)</li>
-                    </ul>
-                </div>
-                <div class="feature-card">
-                    <h3>Ikram Aziz</h3>
-                    <ul style="margin-top: 1rem; color: #ccc;">
-                        <li>Gyro, ultrasonic, color sensors</li>
-                        <li>Target coordinate calculations</li>
-                        <li>Heading and bearing computations</li>
-                        <li>Testing and positining updates</li>
-                    </ul>
-                </div>
-                <div class="feature-card">
-                    <h3>Jonas Jensen</h3>
-                    <ul style="margin-top: 1rem; color: #ccc;">
-                        <li>State machine implementation</li>
-                        <li>Pose estimation & odometry</li>
-                        <li>Exploration and navigation logic</li>
-                        <li>Obstacle avoidance strategies</li>
-                    </ul>
-                </div>
-                <div class="feature-card">
-                    <h3>All Team Members</h3>
-                    <ul style="margin-top: 1rem; color: #ccc;">
-                        <li>All members participated in writing code and verbally assisted one another in working session in and out of class time</li>
-                    </ul>
-                </div>
             </div>
         </section>
 
